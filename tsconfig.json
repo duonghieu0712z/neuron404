@@ -7,8 +7,10 @@
     "include": [
         "src",
         "vite.config.ts",
-        "prettier.config.js",
-        "eslint.config.js",
-        "drizzle.config.ts"
+        "prettier.config.ts",
+        "eslint.config.ts",
+        "drizzle.config.ts",
+        "commitlint.config.ts",
+        "lint-staged.config.js"
     ]
 }
