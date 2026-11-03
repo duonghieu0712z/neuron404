@@ -55,8 +55,11 @@ export default defineConfig(
         },
     },
     {
-        // Override or add rule settings here, such as:
-        // 'svelte/button-has-type': 'error'
-        rules: {},
+        // shadcn-svelte generated primitives forward an arbitrary `href` prop and can't know
+        // whether it's an internal route, so they can't call resolve() themselves.
+        files: ['src/lib/components/ui/**'],
+        rules: {
+            'svelte/no-navigation-without-resolve': 'off',
+        },
     },
 );
