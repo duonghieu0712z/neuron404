@@ -25,6 +25,9 @@ vite.config.ts.timestamp-*
 # SQLite
 *.db
 
+# Neuron content (personal, local-only — not part of the shareable app)
+/content
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

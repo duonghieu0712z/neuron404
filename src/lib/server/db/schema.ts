@@ -1,9 +1,45 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { relations } from 'drizzle-orm';
+import { int, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-export const task = sqliteTable('task', {
-    id: text('id')
-        .primaryKey()
-        .$defaultFn(() => crypto.randomUUID()),
+export const neurons = sqliteTable('neurons', {
+    id: text('id').primaryKey(),
     title: text('title').notNull(),
-    priority: integer('priority').notNull().default(1),
+    status: text('status').notNull(),
+    grounding: text('grounding').notNull(),
+    endorsement: text('endorsement').notNull(),
+    provenance: text('provenance').notNull(),
+    body: text('body').notNull(),
+    filePath: text('file_path').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
 });
+
+export const synapses = sqliteTable('synapses', {
+    id: int('id').primaryKey({ autoIncrement: true }),
+    sourceNeuronId: text('source_neuron_id')
+        .notNull()
+        .references(() => neurons.id, { onDelete: 'cascade' }),
+    targetNeuronId: text('target_neuron_id')
+        .notNull()
+        .references(() => neurons.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    note: text('note'),
+});
+
+export const neuronsRelations = relations(neurons, ({ many }) => ({
+    outgoing: many(synapses, { relationName: 'source' }),
+    incoming: many(synapses, { relationName: 'target' }),
+}));
+
+export const synapsesRelations = relations(synapses, ({ one }) => ({
+    source: one(neurons, {
+        fields: [synapses.sourceNeuronId],
+        references: [neurons.id],
+        relationName: 'source',
+    }),
+    target: one(neurons, {
+        fields: [synapses.targetNeuronId],
+        references: [neurons.id],
+        relationName: 'target',
+    }),
+}));
