@@ -2,6 +2,7 @@
     "name": "neuron404",
     "version": "0.0.1",
     "private": true,
+    "license": "MIT",
     "author": "duonghieu0712z",
     "type": "module",
     "imports": {
