@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { PageProps } from './$types';
 
-    import { resolve } from '$app/paths';
+    import { enhance } from '$app/forms';
 
     import { Button } from '#lib/components/ui/button';
     import { Input } from '#lib/components/ui/input';
@@ -15,28 +15,55 @@
     let grounding = $state<string>(GROUNDING_LEVELS[0]);
     let endorsement = $state<string>(ENDORSEMENT_LEVELS[0]);
     let provenance = $state<string>(PROVENANCE_SOURCES[0]);
+    let submitting = $state(false);
 </script>
 
-<section class="mx-auto max-w-3xl space-y-6 p-6">
-    <header class="flex items-center justify-between gap-4">
-        <h1 class="text-2xl font-semibold">New neuron</h1>
-        <Button href={resolve('/neurons')} variant="outline">Back to neurons</Button>
-    </header>
+<svelte:head>
+    <title>New neuron · neuron404</title>
+</svelte:head>
 
-    <form method="post" class="space-y-4">
+<section class="w-full max-w-2xl space-y-6 p-6">
+    <h1 class="text-2xl font-semibold">New neuron</h1>
+
+    <form
+        method="post"
+        class="space-y-4"
+        use:enhance={() => {
+            submitting = true;
+            return async ({ update }) => {
+                await update();
+                submitting = false;
+            };
+        }}
+    >
         <div class="space-y-1.5">
-            <Label for="title">Title</Label>
-            <Input id="title" name="title" required />
+            <Label for="title"
+                >Title <span aria-hidden="true" class="text-destructive">*</span></Label
+            >
+            <Input
+                id="title"
+                name="title"
+                required
+                aria-describedby={form?.errors?.title ? 'title-error' : undefined}
+            />
             {#if form?.errors?.title}
-                <p class="text-xs text-destructive">{form.errors.title[0]}</p>
+                <p id="title-error" class="text-xs text-destructive">{form.errors.title[0]}</p>
             {/if}
         </div>
 
         <div class="space-y-1.5">
-            <Label for="body">Content</Label>
-            <Textarea id="body" name="body" rows={8} required />
+            <Label for="body"
+                >Content <span aria-hidden="true" class="text-destructive">*</span></Label
+            >
+            <Textarea
+                id="body"
+                name="body"
+                rows={8}
+                required
+                aria-describedby={form?.errors?.body ? 'body-error' : undefined}
+            />
             {#if form?.errors?.body}
-                <p class="text-xs text-destructive">{form.errors.body[0]}</p>
+                <p id="body-error" class="text-xs text-destructive">{form.errors.body[0]}</p>
             {/if}
         </div>
 
@@ -82,6 +109,8 @@
             </div>
         </div>
 
-        <Button type="submit">Create</Button>
+        <Button type="submit" disabled={submitting}>
+            {submitting ? 'Creating…' : 'Create'}
+        </Button>
     </form>
 </section>
