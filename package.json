@@ -26,6 +26,7 @@
         "lint:fix": "eslint --fix . --cache",
         "neuron:add": "node --import tsx scripts/add-neuron.ts",
         "neuron:lint": "node --import tsx scripts/lint-neurons.ts",
+        "neuron:search": "node --import tsx scripts/search-neurons.ts",
         "prepare": "svelte-kit sync || echo '' && husky",
         "preview": "vite preview",
         "type-check": "pnpm check"
