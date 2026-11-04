@@ -17,11 +17,11 @@
     let provenance = $state<string>(PROVENANCE_SOURCES[0]);
 </script>
 
-<section class="mx-auto max-w-2xl space-y-6 p-6">
-    <Button href={resolve('/neurons')} variant="link" class="px-0 text-muted-foreground">
-        &larr; All neurons
-    </Button>
-    <h1 class="text-2xl font-semibold">New neuron</h1>
+<section class="mx-auto max-w-3xl space-y-6 p-6">
+    <header class="flex items-center justify-between gap-4">
+        <h1 class="text-2xl font-semibold">New neuron</h1>
+        <Button href={resolve('/neurons')} variant="outline">Back to neurons</Button>
+    </header>
 
     <form method="post" class="space-y-4">
         <div class="space-y-1.5">

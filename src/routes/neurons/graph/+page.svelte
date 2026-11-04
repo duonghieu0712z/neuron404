@@ -2,6 +2,7 @@
     import type { PageProps } from './$types';
     import type { SimulationLinkDatum, SimulationNodeDatum } from 'd3-force';
 
+    import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
     import {
         forceCenter,
@@ -12,16 +13,20 @@
         forceX,
         forceY,
     } from 'd3-force';
+    import Graph from 'graphology';
+    import { mode } from 'mode-watcher';
+    import Sigma, { DEFAULT_STYLES } from 'sigma';
 
     import { Button } from '#lib/components/ui/button';
-    import { Card, CardContent } from '#lib/components/ui/card';
     import { SYNAPSE_KINDS } from '#lib/neuron/schema';
 
     let { data }: PageProps = $props();
 
     const WIDTH = 900;
     const HEIGHT = 620;
-    const NODE_RADIUS = 7;
+    const NODE_SIZE = 8;
+
+    type SynapseKind = (typeof SYNAPSE_KINDS)[number];
 
     interface SimNode extends SimulationNodeDatum {
         id: string;
@@ -34,27 +39,36 @@
         targetId: string;
     }
 
-    interface PositionedNode {
-        id: string;
-        title: string;
-        x: number;
-        y: number;
-    }
+    const SYNAPSE_COLORS: Record<SynapseKind, { dark: string; light: string }> = {
+        cites: { dark: '#c98500', light: '#eda100' },
+        contradicts: { dark: '#d95926', light: '#eb6834' },
+        extends: { dark: '#199e70', light: '#1baf7a' },
+        questions: { dark: '#d55181', light: '#e87ba4' },
+        supports: { dark: '#3987e5', light: '#2a78d6' },
+    };
 
-    interface PositionedEdge {
-        kind: string;
-        source: string;
-        target: string;
-        x1: number;
-        y1: number;
-        x2: number;
-        y2: number;
-    }
+    const FOREGROUND = { dark: 'oklch(0.985 0 0)', light: 'oklch(0.145 0 0)' };
 
-    let graphNodes = $state<PositionedNode[]>([]);
-    let graphEdges = $state<PositionedEdge[]>([]);
+    let containerEl = $state<HTMLDivElement>();
+
+    function cssColorToRgb(cssColor: string): string {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return cssColor;
+        ctx.fillStyle = cssColor;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        return `rgb(${r}, ${g}, ${b})`;
+    }
 
     $effect(() => {
+        if (!containerEl) return;
+
+        const isDark = mode.current === 'dark';
+        const nodeColor = cssColorToRgb(FOREGROUND[isDark ? 'dark' : 'light']);
+
         const nodeIds = new Set(data.nodes.map((node) => node.id));
         const simNodes: SimNode[] = data.nodes.map((node) => ({ ...node, x: 0, y: 0 }));
         const simLinks: SimLink[] = data.edges
@@ -65,10 +79,10 @@
                     nodeIds.has(edge.target),
             )
             .map((edge) => ({
-                source: edge.source,
-                target: edge.target,
                 kind: edge.kind,
+                source: edge.source,
                 sourceId: edge.source,
+                target: edge.target,
                 targetId: edge.target,
             }));
 
@@ -82,170 +96,86 @@
             )
             .force('charge', forceManyBody().strength(-280))
             .force('center', forceCenter(WIDTH / 2, HEIGHT / 2))
-            .force('collide', forceCollide(NODE_RADIUS + 28))
+            .force('collide', forceCollide(NODE_SIZE + 28))
             .force('x', forceX(WIDTH / 2).strength(0.05))
             .force('y', forceY(HEIGHT / 2).strength(0.05))
             .stop();
 
         for (let i = 0; i < 400; i += 1) simulation.tick();
 
-        const positionById = new Map(
-            simNodes.map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }]),
-        );
+        const graph = new Graph({ multi: true, type: 'directed' });
 
-        graphNodes = simNodes.map((node) => ({
-            id: node.id,
-            title: node.title,
-            x: node.x ?? 0,
-            y: node.y ?? 0,
-        }));
+        for (const node of simNodes) {
+            graph.addNode(node.id, {
+                color: nodeColor,
+                label: node.title,
+                size: NODE_SIZE,
+                x: node.x ?? 0,
+                y: node.y ?? 0,
+            });
+        }
 
-        graphEdges = simLinks
-            .map((edge) => {
-                const from = positionById.get(edge.sourceId);
-                const to = positionById.get(edge.targetId);
-                if (!from || !to) return null;
+        for (const link of simLinks) {
+            graph.addEdge(link.sourceId, link.targetId, {
+                color: SYNAPSE_COLORS[link.kind as SynapseKind][isDark ? 'dark' : 'light'],
+                kind: link.kind,
+                size: 2,
+            });
+        }
 
-                const dx = to.x - from.x;
-                const dy = to.y - from.y;
-                const length = Math.hypot(dx, dy) || 1;
-                const ux = dx / length;
-                const uy = dy / length;
+        const sigmaInstance = new Sigma(graph, containerEl, {
+            settings: {
+                labelRenderedSizeThreshold: 0,
+                renderLabels: true,
+            },
+            styles: {
+                edges: DEFAULT_STYLES.edges,
+                nodes: {
+                    ...DEFAULT_STYLES.nodes,
+                    labelColor: {
+                        else: { attribute: 'color' },
+                        then: '#000000',
+                        whenState: 'isHovered',
+                    },
+                },
+            },
+        });
 
-                return {
-                    kind: edge.kind,
-                    source: edge.sourceId,
-                    target: edge.targetId,
-                    x1: from.x + ux * NODE_RADIUS,
-                    y1: from.y + uy * NODE_RADIUS,
-                    x2: to.x - ux * (NODE_RADIUS + 6),
-                    y2: to.y - uy * (NODE_RADIUS + 6),
-                };
-            })
-            .filter((edge): edge is PositionedEdge => edge !== null);
-    });
+        sigmaInstance.on('clickNode', ({ node }) => {
+            void goto(resolve('/neurons/[id]', { id: node }));
+        });
 
-    function truncate(title: string, max = 22): string {
-        return title.length > max ? `${title.slice(0, max - 1)}…` : title;
-    }
+        const handleResize = () => sigmaInstance.resize();
+        window.addEventListener('resize', handleResize);
 
-    const LABEL_WIDTH = 170;
-    const PADDING = 50;
-
-    let viewBox = $derived.by(() => {
-        if (graphNodes.length === 0) return `0 0 ${WIDTH} ${HEIGHT}`;
-
-        const xs = graphNodes.map((node) => node.x);
-        const ys = graphNodes.map((node) => node.y);
-        const minX = Math.min(...xs) - PADDING;
-        const maxX = Math.max(...xs) + PADDING + LABEL_WIDTH;
-        const minY = Math.min(...ys) - PADDING;
-        const maxY = Math.max(...ys) + PADDING;
-
-        return `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            sigmaInstance.kill();
+        };
     });
 </script>
 
-<section class="mx-auto max-w-5xl space-y-6 p-6">
+<div class="flex flex-col gap-4 p-6">
     <header class="flex items-center justify-between gap-4">
         <h1 class="text-2xl font-semibold">Graph</h1>
         <Button href={resolve('/neurons')} variant="outline">Back to neurons</Button>
     </header>
 
-    <div class="graph-root space-y-4">
-        <Card>
-            <CardContent>
-                <svg {viewBox} class="h-auto w-full" role="img" aria-label="Neuron synapse graph">
-                    <defs>
-                        {#each SYNAPSE_KINDS as kind (kind)}
-                            <marker
-                                id={`arrow-${kind}`}
-                                viewBox="0 0 10 10"
-                                refX="9"
-                                refY="5"
-                                markerWidth="7"
-                                markerHeight="7"
-                                orient="auto-start-reverse"
-                            >
-                                <path
-                                    d="M0,0 L10,5 L0,10 Z"
-                                    style={`fill: var(--synapse-${kind})`}
-                                />
-                            </marker>
-                        {/each}
-                    </defs>
+    <div class="relative h-[80dvh] min-h-125 w-full overflow-hidden rounded-sm border">
+        <div bind:this={containerEl} class="h-full w-full"></div>
 
-                    {#each graphEdges as edge (edge.source + edge.target + edge.kind)}
-                        <line
-                            x1={edge.x1}
-                            y1={edge.y1}
-                            x2={edge.x2}
-                            y2={edge.y2}
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            marker-end={`url(#arrow-${edge.kind})`}
-                            style={`stroke: var(--synapse-${edge.kind})`}
-                        >
-                            <title>{edge.kind}</title>
-                        </line>
-                    {/each}
-
-                    {#each graphNodes as node (node.id)}
-                        <a href={resolve('/neurons/[id]', { id: node.id })}>
-                            <title>{node.title}</title>
-                            <circle
-                                cx={node.x}
-                                cy={node.y}
-                                r={NODE_RADIUS + 9}
-                                fill="transparent"
-                            />
-                            <circle
-                                cx={node.x}
-                                cy={node.y}
-                                r={NODE_RADIUS}
-                                class="fill-foreground"
-                            />
-                            <text
-                                x={node.x + NODE_RADIUS + 5}
-                                y={node.y + 4}
-                                class="fill-foreground text-[11px]"
-                            >
-                                {truncate(node.title)}
-                            </text>
-                        </a>
-                    {/each}
-                </svg>
-            </CardContent>
-        </Card>
-
-        <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+        <div
+            class="absolute bottom-4 left-4 flex flex-wrap gap-x-4 gap-y-1.5 rounded-sm border bg-popover/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm"
+        >
             {#each SYNAPSE_KINDS as kind (kind)}
                 <span class="flex items-center gap-1.5">
                     <span
                         class="inline-block h-0.5 w-4"
-                        style={`background-color: var(--synapse-${kind})`}
+                        style={`background-color: ${SYNAPSE_COLORS[kind][mode.current === 'dark' ? 'dark' : 'light']}`}
                     ></span>
                     {kind}
                 </span>
             {/each}
         </div>
     </div>
-</section>
-
-<style>
-    .graph-root {
-        --synapse-supports: #2a78d6;
-        --synapse-contradicts: #eb6834;
-        --synapse-extends: #1baf7a;
-        --synapse-cites: #eda100;
-        --synapse-questions: #e87ba4;
-    }
-
-    :global(.dark) .graph-root {
-        --synapse-supports: #3987e5;
-        --synapse-contradicts: #d95926;
-        --synapse-extends: #199e70;
-        --synapse-cites: #c98500;
-        --synapse-questions: #d55181;
-    }
-</style>
+</div>

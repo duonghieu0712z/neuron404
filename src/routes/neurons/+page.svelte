@@ -3,9 +3,11 @@
 
     import { resolve } from '$app/paths';
 
+    import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
-    import { Card, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card';
+    import { Card, CardHeader, CardTitle } from '#lib/components/ui/card';
     import { Input } from '#lib/components/ui/input';
+    import { Label } from '#lib/components/ui/label';
 
     let { data }: PageProps = $props();
 </script>
@@ -21,7 +23,8 @@
     </header>
 
     <form method="get" class="flex gap-2">
-        <Input type="search" name="q" value={data.query} placeholder="Search neurons..." />
+        <Label for="q" class="sr-only">Search neurons</Label>
+        <Input id="q" type="search" name="q" value={data.query} placeholder="Search neurons..." />
         <Button type="submit" variant="outline">Search</Button>
     </form>
 
@@ -31,7 +34,7 @@
         <div class="space-y-3">
             {#each data.neurons as neuron (neuron.id)}
                 <Card>
-                    <CardHeader>
+                    <CardHeader class="gap-3">
                         <CardTitle>
                             <a
                                 href={resolve('/neurons/[id]', { id: neuron.id })}
@@ -40,11 +43,12 @@
                                 {neuron.title}
                             </a>
                         </CardTitle>
-                        <CardDescription>
-                            {neuron.status} · grounding: {neuron.grounding} · endorsement: {neuron.endorsement}
-                            · provenance:
-                            {neuron.provenance}
-                        </CardDescription>
+                        <div class="flex flex-wrap gap-1.5">
+                            <Badge variant="outline">{neuron.status}</Badge>
+                            <Badge variant="outline">grounding: {neuron.grounding}</Badge>
+                            <Badge variant="outline">endorsement: {neuron.endorsement}</Badge>
+                            <Badge variant="outline">provenance: {neuron.provenance}</Badge>
+                        </div>
                     </CardHeader>
                 </Card>
             {/each}

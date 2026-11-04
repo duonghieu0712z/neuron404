@@ -3,31 +3,27 @@
 
     import { resolve } from '$app/paths';
 
+    import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
-    import {
-        Card,
-        CardContent,
-        CardDescription,
-        CardHeader,
-        CardTitle,
-    } from '#lib/components/ui/card';
+    import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
 
     let { data }: PageProps = $props();
 </script>
 
 <article class="mx-auto max-w-3xl space-y-6 p-6">
-    <Button href={resolve('/neurons')} variant="link" class="px-0 text-muted-foreground">
-        &larr; All neurons
-    </Button>
+    <header class="flex items-center justify-between gap-4">
+        <h1 class="text-2xl font-semibold">{data.neuron.title}</h1>
+        <Button href={resolve('/neurons')} variant="outline">Back to neurons</Button>
+    </header>
 
     <Card>
         <CardHeader>
-            <CardTitle class="text-2xl">{data.neuron.title}</CardTitle>
-            <CardDescription>
-                {data.neuron.status} · grounding: {data.neuron.grounding} · endorsement: {data
-                    .neuron.endorsement} · provenance:
-                {data.neuron.provenance}
-            </CardDescription>
+            <div class="flex flex-wrap gap-1.5">
+                <Badge variant="outline">{data.neuron.status}</Badge>
+                <Badge variant="outline">grounding: {data.neuron.grounding}</Badge>
+                <Badge variant="outline">endorsement: {data.neuron.endorsement}</Badge>
+                <Badge variant="outline">provenance: {data.neuron.provenance}</Badge>
+            </div>
         </CardHeader>
         <CardContent>
             <div class="text-sm whitespace-pre-wrap">{data.neuron.body}</div>
