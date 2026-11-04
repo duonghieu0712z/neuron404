@@ -2,8 +2,6 @@
     import type { PageProps } from './$types';
     import type { SimulationLinkDatum, SimulationNodeDatum } from 'd3-force';
 
-    import { goto } from '$app/navigation';
-    import { resolve } from '$app/paths';
     import {
         forceCenter,
         forceCollide,
@@ -17,10 +15,12 @@
     import { mode } from 'mode-watcher';
     import Sigma, { DEFAULT_STYLES } from 'sigma';
 
-    import { Button } from '#lib/components/ui/button';
+    import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
     import { SYNAPSE_KINDS } from '#lib/neuron/schema';
 
     let { data }: PageProps = $props();
+
+    const panel = getNeuronPanelContext();
 
     const WIDTH = 900;
     const HEIGHT = 620;
@@ -64,7 +64,7 @@
     }
 
     $effect(() => {
-        if (!containerEl) return;
+        if (!containerEl || data.nodes.length === 0) return;
 
         const isDark = mode.current === 'dark';
         const nodeColor = cssColorToRgb(FOREGROUND[isDark ? 'dark' : 'light']);
@@ -141,28 +141,45 @@
             },
         });
 
-        sigmaInstance.on('clickNode', ({ node }) => {
-            void goto(resolve('/neurons/[id]', { id: node }));
+        sigmaInstance.on('clickNode', ({ node, event }) => {
+            event.original.stopPropagation();
+            void panel.open(node);
         });
 
-        const handleResize = () => sigmaInstance.resize();
-        window.addEventListener('resize', handleResize);
+        sigmaInstance.on('clickStage', ({ event }) => {
+            event.original.stopPropagation();
+            panel.close();
+        });
+
+        let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+        const resizeObserver = new ResizeObserver((entries) => {
+            const { width, height } = entries[0]?.contentRect ?? { height: 0, width: 0 };
+            if (width === 0 || height === 0) return;
+
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => sigmaInstance.resize(), 150);
+        });
+        resizeObserver.observe(containerEl);
 
         return () => {
-            window.removeEventListener('resize', handleResize);
+            clearTimeout(resizeTimer);
+            resizeObserver.disconnect();
             sigmaInstance.kill();
         };
     });
 </script>
 
-<div class="flex flex-col gap-4 p-6">
-    <header class="flex items-center justify-between gap-4">
-        <h1 class="text-2xl font-semibold">Graph</h1>
-        <Button href={resolve('/neurons')} variant="outline">Back to neurons</Button>
-    </header>
+<svelte:head>
+    <title>Graph · neuron404</title>
+</svelte:head>
 
-    <div class="relative h-[80dvh] min-h-125 w-full overflow-hidden rounded-sm border">
-        <div bind:this={containerEl} class="h-full w-full"></div>
+{#if data.nodes.length === 0}
+    <div class="flex h-full w-full items-center justify-center">
+        <p class="text-sm text-muted-foreground">No neurons yet.</p>
+    </div>
+{:else}
+    <div class="relative h-full w-full">
+        <div bind:this={containerEl} data-neuron-trigger class="h-full w-full"></div>
 
         <div
             class="absolute bottom-4 left-4 flex flex-wrap gap-x-4 gap-y-1.5 rounded-sm border bg-popover/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm"
@@ -178,4 +195,4 @@
             {/each}
         </div>
     </div>
-</div>
+{/if}

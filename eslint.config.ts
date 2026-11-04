@@ -63,4 +63,10 @@ export default defineConfig(
             'svelte/no-navigation-without-resolve': 'off',
         },
     },
+    {
+        files: ['src/routes/neurons/+page.svelte'],
+        rules: {
+            'svelte/no-navigation-without-resolve': ['error', { ignoreGoto: true }],
+        },
+    },
 );

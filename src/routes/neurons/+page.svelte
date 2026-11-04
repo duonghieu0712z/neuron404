@@ -1,55 +1,102 @@
 <script lang="ts">
     import type { PageProps } from './$types';
 
+    import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
+    import { SvelteURLSearchParams } from 'svelte/reactivity';
 
     import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
-    import { Card, CardHeader, CardTitle } from '#lib/components/ui/card';
+    import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
     import { Input } from '#lib/components/ui/input';
     import { Label } from '#lib/components/ui/label';
+    import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
     let { data }: PageProps = $props();
+
+    const panel = getNeuronPanelContext();
+
+    let searchValue = $state(data.query);
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+    function handleSearchInput(event: Event) {
+        searchValue = (event.currentTarget as HTMLInputElement).value;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            const params = new SvelteURLSearchParams();
+            if (searchValue) params.set('q', searchValue);
+            const query = params.toString();
+            void goto(`${resolve('/neurons')}${query ? `?${query}` : ''}`, {
+                replace: true,
+                reset: false,
+            });
+        }, 300);
+    }
+
+    function handleClick(event: MouseEvent, id: string) {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+        event.preventDefault();
+        void panel.open(id);
+    }
 </script>
 
-<section class="mx-auto max-w-3xl space-y-6 p-6">
-    <header class="flex items-center justify-between gap-4">
-        <h1 class="text-2xl font-semibold">Neurons</h1>
-        <div class="flex gap-2">
-            <Button href={resolve('/neurons/graph')} variant="outline">Graph</Button>
-            <Button href={resolve('/neurons/lint')} variant="outline">Lint / Verify</Button>
-            <Button href={resolve('/neurons/new')}>New neuron</Button>
-        </div>
-    </header>
+<svelte:head>
+    <title>Neurons · neuron404</title>
+</svelte:head>
 
-    <form method="get" class="flex gap-2">
+<section class="w-full space-y-6 p-6">
+    <h1 class="sr-only">Neurons</h1>
+
+    <div class="max-w-sm">
         <Label for="q" class="sr-only">Search neurons</Label>
-        <Input id="q" type="search" name="q" value={data.query} placeholder="Search neurons..." />
-        <Button type="submit" variant="outline">Search</Button>
-    </form>
+        <Input
+            id="q"
+            type="search"
+            value={searchValue}
+            oninput={handleSearchInput}
+            placeholder="Search neurons..."
+        />
+    </div>
 
     {#if data.neurons.length === 0}
-        <p class="text-sm text-muted-foreground">No neurons yet.</p>
+        <div class="flex flex-col items-start gap-3 rounded-sm border border-dashed p-8">
+            {#if data.query}
+                <p class="text-sm text-muted-foreground">No results for "{data.query}".</p>
+                <Button href={resolve('/neurons')} variant="outline">Clear search</Button>
+            {:else}
+                <p class="text-sm text-muted-foreground">No neurons yet.</p>
+                <Button href={resolve('/neurons/new')}>New neuron</Button>
+            {/if}
+        </div>
     {:else}
-        <div class="space-y-3">
+        <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {#each data.neurons as neuron (neuron.id)}
-                <Card>
-                    <CardHeader class="gap-3">
-                        <CardTitle>
-                            <a
-                                href={resolve('/neurons/[id]', { id: neuron.id })}
-                                class="hover:underline"
+                <Card
+                    class="cursor-pointer"
+                    data-neuron-trigger
+                    onclick={(event) => handleClick(event, neuron.id)}
+                >
+                    <CardHeader class="gap-1.5">
+                        <div class="flex min-w-0 items-center justify-between gap-2">
+                            <CardTitle class="min-w-0 truncate">
+                                <a href={resolve('/neurons/[id]', { id: neuron.id })}>
+                                    {neuron.title}
+                                </a>
+                            </CardTitle>
+                            <Badge
+                                variant={neuron.status === 'published' ? 'default' : 'outline'}
+                                class="shrink-0"
                             >
-                                {neuron.title}
-                            </a>
-                        </CardTitle>
-                        <div class="flex flex-wrap gap-1.5">
-                            <Badge variant="outline">{neuron.status}</Badge>
-                            <Badge variant="outline">grounding: {neuron.grounding}</Badge>
-                            <Badge variant="outline">endorsement: {neuron.endorsement}</Badge>
-                            <Badge variant="outline">provenance: {neuron.provenance}</Badge>
+                                {neuron.status}
+                            </Badge>
                         </div>
                     </CardHeader>
+                    <CardContent class="space-y-2">
+                        <p class="line-clamp-2 text-sm text-muted-foreground">{neuron.body}</p>
+                        <p class="truncate text-xs text-muted-foreground">
+                            {neuron.grounding} · {neuron.endorsement} · {neuron.provenance}
+                        </p>
+                    </CardContent>
                 </Card>
             {/each}
         </div>
