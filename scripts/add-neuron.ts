@@ -4,6 +4,8 @@ import { newNeuronInputSchema } from '#lib/neuron/schema';
 import { createDb } from '#lib/server/db/client';
 import { createNeuron } from '#lib/server/neuron/create';
 
+import './env';
+
 async function readStdin(): Promise<string> {
     const chunks: Buffer[] = [];
     for await (const chunk of process.stdin) chunks.push(chunk as Buffer);

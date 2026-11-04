@@ -6,7 +6,7 @@ import matter from '@11ty/gray-matter';
 
 import { neuronFrontmatterSchema, type Neuron, type NeuronFrontmatter } from '#lib/neuron/schema';
 
-export const NEURONS_DIR = path.resolve(process.cwd(), 'content/neurons');
+export const NEURONS_DIR = path.resolve(import.meta.dirname, '../../../../content/neurons');
 
 function filePathFor(id: string) {
     return path.join(NEURONS_DIR, `${id}.md`);
