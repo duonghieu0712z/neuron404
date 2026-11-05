@@ -61,6 +61,10 @@ export const newNeuronInputSchema = z.object({
 });
 
 export const updateNeuronInputSchema = newNeuronInputSchema.partial().extend({
+    topics: newNeuronInputSchema.shape.topics.removeDefault().optional(),
+    synapses: newNeuronInputSchema.shape.synapses.removeDefault().optional(),
+    aliases: newNeuronInputSchema.shape.aliases.removeDefault().optional(),
+    sources: newNeuronInputSchema.shape.sources.removeDefault().optional(),
     expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
     status: z.enum(NEURON_STATUSES).optional(),
     lifecycle: z.enum(['active', 'superseded', 'retracted']).optional(),
