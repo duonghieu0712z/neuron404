@@ -69,10 +69,12 @@
             {/if}
         </div>
     {:else}
-        <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+            class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] items-start gap-4"
+        >
             {#each data.neurons as neuron (neuron.id)}
                 <Card
-                    class="cursor-pointer"
+                    class="w-full max-w-96 min-w-0 cursor-pointer"
                     data-neuron-trigger
                     onclick={(event) => handleClick(event, neuron.id)}
                 >
