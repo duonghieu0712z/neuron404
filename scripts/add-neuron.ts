@@ -49,7 +49,12 @@ const neuron = await createNeuron(db, parsed.data);
 
 console.log(
     JSON.stringify(
-        { id: neuron.id, title: neuron.title, filePath: `content/neurons/${neuron.id}.md` },
+        {
+            id: neuron.id,
+            title: neuron.title,
+            revision: neuron.revision,
+            filePath: `content/neurons/${neuron.id}.md`,
+        },
         null,
         2,
     ),

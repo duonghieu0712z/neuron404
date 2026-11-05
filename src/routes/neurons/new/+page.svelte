@@ -10,12 +10,13 @@
     import { Textarea } from '#lib/components/ui/textarea';
     import { ENDORSEMENT_LEVELS, GROUNDING_LEVELS, PROVENANCE_SOURCES } from '#lib/neuron/schema';
 
-    let { form }: PageProps = $props();
+    let { form, data }: PageProps = $props();
 
     let grounding = $state<string>(GROUNDING_LEVELS[0]);
     let endorsement = $state<string>(ENDORSEMENT_LEVELS[0]);
     let provenance = $state<string>(PROVENANCE_SOURCES[0]);
     let submitting = $state(false);
+    let topic = $state('');
 </script>
 
 <svelte:head>
@@ -37,9 +38,9 @@
         }}
     >
         <div class="space-y-1.5">
-            <Label for="title"
-                >Title <span aria-hidden="true" class="text-destructive">*</span></Label
-            >
+            <Label for="title">
+                Title <span aria-hidden="true" class="text-destructive">*</span>
+            </Label>
             <Input
                 id="title"
                 name="title"
@@ -52,9 +53,9 @@
         </div>
 
         <div class="space-y-1.5">
-            <Label for="body"
-                >Content <span aria-hidden="true" class="text-destructive">*</span></Label
-            >
+            <Label for="body">
+                Content <span aria-hidden="true" class="text-destructive">*</span>
+            </Label>
             <Textarea
                 id="body"
                 name="body"
@@ -65,6 +66,23 @@
             {#if form?.errors?.body}
                 <p id="body-error" class="text-xs text-destructive">{form.errors.body[0]}</p>
             {/if}
+        </div>
+
+        <div class="space-y-1.5">
+            <Label for="topic">Region</Label>
+            <Select type="single" name="topic" bind:value={topic}>
+                <SelectTrigger id="topic" class="w-full">
+                    {data.topics.find((item) => item.id === topic)?.title ?? 'Unfiled'}
+                </SelectTrigger>
+                <SelectContent>
+                    {#each data.topics as item (item.id)}
+                        <SelectItem value={item.id} label={item.title} />
+                    {/each}
+                </SelectContent>
+            </Select>
+            {#if form?.errors?.topics}<p class="text-xs text-destructive">
+                    {form.errors.topics[0]}
+                </p>{/if}
         </div>
 
         <div class="grid grid-cols-3 gap-4">
