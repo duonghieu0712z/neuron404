@@ -29,6 +29,8 @@ A request to read or evaluate does not authorize saving, rewriting, or adding sy
 
 Use the CLI for mutations. It handles source snapshots, revision history, validation, and index synchronization. Do not bypass optimistic concurrency or edit SQLite directly. A save is complete only when its receipt returns an ID and revision.
 
+Authorized ingestion includes automatic Region classification. Reuse a suitable Region or register one with `region:add` before saving; do not leave knowledge Unfiled merely because its Region is new. The Maintain workflow defines the classification criteria.
+
 ## Improve the shared skill
 
 The user authorizes improving this skill during real use when an observed failure, ambiguity, or repeated friction justifies a focused correction. The canonical source is this skill directory after resolving symlinks, normally `<repository>/skills/neuron404/`; a store override does not relocate the skill source. Claude and Codex global entries should remain symlinks to it, so improvements remain in the project and reach both clients. Resolve symlinks before editing; preserve links instead of replacing them with copies.

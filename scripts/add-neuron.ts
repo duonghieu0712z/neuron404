@@ -3,7 +3,7 @@ import './env';
 import path from 'node:path';
 import process from 'node:process';
 
-import { newNeuronInputSchema } from '#lib/neuron/schema';
+import { classifiedNeuronInputSchema } from '#lib/neuron/schema';
 import { createDb } from '#lib/server/db/client';
 import { createNeuron } from '#lib/server/neuron/create';
 import { NEURONS_DIR } from '#lib/server/neuron/store';
@@ -25,6 +25,7 @@ if (!raw.trim()) {
                 grounding: 'inferred',
                 endorsement: 'unreviewed',
                 provenance: 'original',
+                topics: ['region-id'],
                 synapses: [],
             },
             null,
@@ -35,7 +36,7 @@ if (!raw.trim()) {
 }
 
 const payload: unknown = JSON.parse(raw);
-const parsed = newNeuronInputSchema.safeParse(payload);
+const parsed = classifiedNeuronInputSchema.safeParse(payload);
 
 if (!parsed.success) {
     console.error('Invalid neuron payload:');
@@ -52,6 +53,7 @@ console.log(
             id: neuron.id,
             title: neuron.title,
             revision: neuron.revision,
+            topics: neuron.topics,
             filePath: path.join(NEURONS_DIR, `${neuron.id}.md`),
         },
         null,

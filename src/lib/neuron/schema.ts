@@ -60,6 +60,12 @@ export const newNeuronInputSchema = z.object({
     sources: z.array(z.string().regex(/^[a-f0-9]{64}$/)).default([]),
 });
 
+export const classifiedNeuronInputSchema = newNeuronInputSchema.extend({
+    topics: z
+        .array(topicIdSchema)
+        .min(1, 'Choose an existing Region or create one with region:add.'),
+});
+
 export const updateNeuronInputSchema = newNeuronInputSchema.partial().extend({
     topics: newNeuronInputSchema.shape.topics.removeDefault().optional(),
     synapses: newNeuronInputSchema.shape.synapses.removeDefault().optional(),

@@ -2,7 +2,7 @@ import './env';
 
 import process from 'node:process';
 
-import { newNeuronInputSchema, updateNeuronInputSchema } from '#lib/neuron/schema';
+import { classifiedNeuronInputSchema, updateNeuronInputSchema } from '#lib/neuron/schema';
 import { createDb } from '#lib/server/db/client';
 import { createNeuron, updateNeuron } from '#lib/server/neuron/create';
 import { rebuildIndex, synchronizeIndex } from '#lib/server/neuron/indexer';
@@ -10,6 +10,7 @@ import { lintNeurons } from '#lib/server/neuron/lint';
 import { readCatalog, readNeuronContext, readNeuronHistory } from '#lib/server/neuron/read';
 import { searchNeurons } from '#lib/server/neuron/search';
 import { readSource, saveSource } from '#lib/server/neuron/sources';
+import { addRegion } from '#lib/server/neuron/topics';
 
 async function readPayload() {
     const chunks: Buffer[] = [];
@@ -31,6 +32,7 @@ try {
     if (command === 'read') result = await readNeuronContext(args);
     else if (command === 'history') result = await readNeuronHistory(args[0], args[1]);
     else if (command === 'catalog') result = await readCatalog();
+    else if (command === 'region:add') result = await addRegion(await readPayload());
     else if (command === 'source:add') {
         const saved = await saveSource(await readPayload());
         result = {
@@ -49,7 +51,7 @@ try {
         if (command === 'add' || command === 'update') {
             const saved =
                 command === 'add'
-                    ? await createNeuron(db, newNeuronInputSchema.parse(await readPayload()))
+                    ? await createNeuron(db, classifiedNeuronInputSchema.parse(await readPayload()))
                     : await updateNeuron(
                           db,
                           args[0],
@@ -60,6 +62,7 @@ try {
                 title: saved.title,
                 revision: saved.revision,
                 lifecycle: saved.lifecycle,
+                topics: saved.topics,
             };
         } else if (command === 'index')
             result = args.includes('--rebuild')
@@ -77,7 +80,7 @@ try {
         }
     } else {
         throw new Error(
-            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--include-history]|read ID...|history ID [REVISION]|catalog|source:add|source:read ID|index [--rebuild]|lint>',
+            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--include-history]|read ID...|history ID [REVISION]|catalog|region:add|source:add|source:read ID|index [--rebuild]|lint>',
         );
     }
     console.log(JSON.stringify(result, null, 2));

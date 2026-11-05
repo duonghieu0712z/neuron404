@@ -76,6 +76,7 @@ For `add`, `update`, and `source:add`, pipe JSON into the same `exec -T` command
 - `content/history/<id>/<revision>.md`: exact original and subsequent versions saved by updates.
 - `content/operations.jsonl`: append-only write receipts with current and previous revisions.
 - `content/topics.json`: topic definitions; membership is neuron metadata.
+- `content/history/regions/<revision>.json`: exact catalog snapshots before adding Regions.
 - SQLite: derived neuron, relation, and full-text indexes. Rebuild from Markdown with `pnpm neuron index --rebuild`.
 
 Personal content and databases are ignored by Git. Application Git history is not a backup of personal knowledge. Keep private backups of the content directory; rebuilding SQLite cannot recreate lost source files or neuron revisions.
@@ -92,6 +93,7 @@ Use `pnpm neuron <command>` inside this repository. From another directory, invo
 
 ```sh
 pnpm neuron catalog
+pnpm neuron region:add < region.json
 pnpm neuron search "runtime defaults" --region project-id --limit 5
 pnpm neuron read neuron-id another-neuron-id
 pnpm neuron source:read source-id
@@ -104,9 +106,11 @@ pnpm neuron lint
 
 `source:add`, `add`, and `update <id>` accept JSON on stdin. `source:add` requires `title`, `uri`, and `content`, with optional `locator`. It returns a snapshot ID; a neuron's `sources` array references those IDs. Repeated captures of identical source payloads reuse the same snapshot.
 
-`add` requires `title`, `body`, `grounding`, `endorsement`, and `provenance`. Optional arrays are `aliases`, `topics`, `sources`, and `synapses`. Each synapse has `target`, `kind`, and optional `note`; supported kinds are `supports`, `contradicts`, `extends`, `cites`, and `questions`.
+The agent classifies knowledge during ingestion, reusing a suitable Region from `catalog` or creating one with `region:add`. This command accepts `{id, title, description}` on stdin, locks the catalog, preserves its previous bytes, and refuses to overwrite a conflicting definition. Repeating an identical definition reuses it. Classification uses the AI running the skill; the CLI does not call a separate model. A new subject should not silently become Unfiled because its Region is absent.
 
-`read` returns the neuron, its content-hash `revision`, incoming links, and relevant contradiction/question/replacement bodies. `update` accepts changed fields plus the exact `expectedRevision` from a fresh read. Concurrent or stale updates fail instead of overwriting newer knowledge. Prior versions retain their exact bytes. Update the same neuron when knowledge develops; create a new neuron for a distinct concept.
+Agent `add` commands require `title`, `body`, `grounding`, `endorsement`, `provenance`, and a nonempty `topics` array of Region IDs. Optional arrays are `aliases`, `sources`, and `synapses`. Each synapse has `target`, `kind`, and optional `note`; supported kinds are `supports`, `contradicts`, `extends`, `cites`, and `questions`. Legacy unfiled neurons remain readable, and the manual web form remains compatible; automatic classification belongs to the agent ingestion workflow.
+
+`read` returns the neuron, its content-hash `revision`, incoming links, and relevant contradiction/question/replacement bodies. `update` accepts changed fields plus the exact `expectedRevision` from a fresh read. Write receipts include `topics` so the agent can confirm Region assignment. Concurrent or stale updates fail instead of overwriting newer knowledge. Prior versions retain their exact bytes. Update the same neuron when knowledge develops; create a new neuron for a distinct concept.
 
 Lifecycle is separate from semantic relationships: `active`, `superseded` with `supersededBy`, or `retracted`. Use `--include-history` to include inactive neurons in search. A `contradicts` synapse does not automatically mark either neuron superseded.
 
