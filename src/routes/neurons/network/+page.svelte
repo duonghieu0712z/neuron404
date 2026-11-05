@@ -24,6 +24,7 @@
         TooltipTrigger,
     } from '#lib/components/ui/tooltip';
     import { getEdgeAppearance } from '#lib/network/edge-appearance';
+    import { chooseLabelPlacements, type LabelPlacement } from '#lib/network/labels';
     import { getRegionHull } from '#lib/network/regions';
     import { createNetworkSimulation, getNodeEntranceOffset } from '#lib/network/simulation';
     import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
@@ -34,6 +35,18 @@
     const panel = getNeuronPanelContext();
 
     const NODE_SIZE = 8;
+    const LABEL_MAX_LENGTH = 40;
+    const LABEL_MAX_WIDTH = 140;
+
+    function shortenLabel(title: string) {
+        const characters = Array.from(title);
+        return characters.length > LABEL_MAX_LENGTH
+            ? `${characters
+                  .slice(0, LABEL_MAX_LENGTH - 3)
+                  .join('')
+                  .trimEnd()}...`
+            : title;
+    }
 
     type SynapseKind = (typeof SYNAPSE_KINDS)[number];
 
@@ -66,7 +79,7 @@
     let motionEnabled = $state(true);
     let reducedMotion = $state(false);
     let applyMotion = $state<((enabled: boolean) => void) | null>(null);
-    let applyFocus = $state<((id: string | null) => void) | null>(null);
+    let applyFocus = $state<((id: string | null, selected: string | null) => void) | null>(null);
     const positions: Record<string, { x: number; y: number } | undefined> = {};
 
     function fitNetworkInView() {
@@ -128,7 +141,8 @@
     );
 
     $effect(() => {
-        applyFocus?.(hoveredNode ?? panel.selected?.neuron.id ?? null);
+        const selected = panel.selected?.neuron.id ?? null;
+        applyFocus?.(hoveredNode ?? selected, selected);
     });
 
     $effect(() => {
@@ -157,7 +171,10 @@
         const foreground = isDark ? '#e5e7eb' : '#272d38';
         const surface = isDark ? '#20242c' : '#ffffff';
         let activeNode: string | null = null;
+        let selectedNode: string | null = null;
         let neighborhood = new Set<string>();
+        let labelPlacements = new Map<string, LabelPlacement>();
+        const compactLabels: Record<string, string | undefined> = Object.create(null);
 
         const nodeIds = new Set(data.nodes.map((node) => node.id));
         const simNodes: SimNode[] = data.nodes.map((node) => ({
@@ -205,6 +222,7 @@
             network.addNode(node.id, {
                 color: (GROUNDING_COLORS[node.grounding] ?? GROUNDING_COLORS.assumption)[theme],
                 label: node.title,
+                shortLabel: shortenLabel(node.title),
                 size: NODE_SIZE + Math.min(12, Math.sqrt(degree) * 3),
                 x: (position?.x ?? node.x ?? 0) + entrance.x,
                 y: (position?.y ?? node.y ?? 0) + entrance.y,
@@ -234,7 +252,6 @@
                 autoRescale: 'once',
                 enableNodeDrag: true,
                 labelRenderedSizeThreshold: 0,
-                labelDensity: 0.6,
                 minCameraRatio: 0.15,
                 maxCameraRatio: 5,
                 stagePadding: 80,
@@ -256,15 +273,29 @@
                     cursor: { whenState: 'isDragged', then: 'grabbing', else: 'grab' },
                 },
             },
-            nodeReducer: (id, attributes) => {
-                if (!activeNode) return attributes;
-                if (!neighborhood.has(id)) {
+            nodeReducer: (id, attributes, nodeAttributes) => {
+                const expanded = id === activeNode || id === selectedNode;
+                const label = expanded
+                    ? nodeAttributes.label
+                    : (compactLabels[id] ?? nodeAttributes.shortLabel);
+                const placement = labelPlacements.get(id);
+                const labelVisibility = placement ? 'visible' : 'hidden';
+                if (!activeNode)
+                    return {
+                        ...attributes,
+                        label,
+                        labelVisibility,
+                        labelPosition: placement ?? 'below',
+                    };
+                if (!neighborhood.has(id) && id !== selectedNode) {
                     return { opacity: 0.2, labelVisibility: 'hidden' };
                 }
                 return {
+                    label,
                     opacity: 1,
-                    labelVisibility: 'visible',
-                    backdropVisibility: id === activeNode ? 'visible' : 'hidden',
+                    labelVisibility,
+                    labelPosition: placement ?? 'below',
+                    backdropVisibility: expanded && placement ? 'visible' : 'hidden',
                 };
             },
             edgeReducer: (id, attributes) => {
@@ -288,6 +319,78 @@
         });
         regionCanvas.setAttribute('aria-hidden', 'true');
         const regionContext = regionCanvas.getContext('2d');
+        const labelWidths: Record<string, number | undefined> = Object.create(null);
+        const measureLabel = (label: string) => {
+            let width = labelWidths[label];
+            if (width === undefined) {
+                width = regionContext?.measureText(label).width ?? Array.from(label).length * 8;
+                labelWidths[label] = width;
+            }
+            return width;
+        };
+        const layoutLabels = () => {
+            sigmaInstance.resize();
+            const { width, height } = sigmaInstance.getDimensions();
+            const cameraState = sigmaInstance.getCamera().getState();
+            if (regionContext) regionContext.font = '12px "Inter Variable", sans-serif';
+            const textChanged: string[] = [];
+            const candidates = network
+                .nodes()
+                .filter(
+                    (id) =>
+                        !sigmaInstance.getNodeState(id).isHidden &&
+                        (!activeNode || neighborhood.has(id) || id === selectedNode),
+                )
+                .map((id) => {
+                    const attributes = network.getNodeAttributes(id);
+                    const expanded = id === activeNode || id === selectedNode;
+                    if (compactLabels[id] === undefined) {
+                        let compact: string = attributes.shortLabel;
+                        if (measureLabel(compact) > LABEL_MAX_WIDTH) {
+                            const characters = Array.from(compact.replace(/\.{3}$/, ''));
+                            do {
+                                characters.pop();
+                                compact = `${characters.join('').trimEnd()}...`;
+                            } while (characters.length && measureLabel(compact) > LABEL_MAX_WIDTH);
+                        }
+                        compactLabels[id] = compact;
+                        textChanged.push(id);
+                    }
+                    const label = expanded ? attributes.label : compactLabels[id]!;
+                    const position = sigmaInstance.graphToViewport(
+                        { x: attributes.x, y: attributes.y },
+                        { cameraState },
+                    );
+                    return {
+                        id,
+                        ...position,
+                        width: measureLabel(label),
+                        radius: sigmaInstance.scaleSize(attributes.size),
+                        priority: id === activeNode ? 2 : id === selectedNode ? 1 : 0,
+                    };
+                });
+            const next = chooseLabelPlacements(candidates, width, height);
+            const changed = network
+                .nodes()
+                .filter(
+                    (id) => textChanged.includes(id) || next.get(id) !== labelPlacements.get(id),
+                );
+            labelPlacements = next;
+            if (changed.length)
+                sigmaInstance.refresh({
+                    partialGraph: { nodes: changed },
+                    skipIndexation: true,
+                    schedule: true,
+                });
+        };
+        sigmaInstance.on('beforeRender', layoutLabels);
+        let disposed = false;
+        void document.fonts.ready.then(() => {
+            if (disposed) return;
+            for (const label of Object.keys(labelWidths)) delete labelWidths[label];
+            for (const id of Object.keys(compactLabels)) delete compactLabels[id];
+            sigmaInstance.scheduleRender();
+        });
         const drawRegions = () => {
             if (!regionContext) return;
             const { width, height } = sigmaInstance.getDimensions();
@@ -366,8 +469,9 @@
         };
         sigmaInstance.on('afterRender', drawRegions);
         sigmaInstance.scheduleRender();
-        applyFocus = (id) => {
+        applyFocus = (id, selected) => {
             activeNode = id && network.hasNode(id) ? id : null;
+            selectedNode = selected && network.hasNode(selected) ? selected : null;
             neighborhood = new Set(
                 activeNode ? [activeNode, ...network.neighbors(activeNode)] : [],
             );
@@ -507,6 +611,8 @@
         resizeObserver.observe(containerEl);
 
         return () => {
+            disposed = true;
+            sigmaInstance.off('beforeRender', layoutLabels);
             sigmaInstance.off('afterRender', drawRegions);
             resizeObserver.disconnect();
             document.removeEventListener('visibilitychange', handleVisibility);
