@@ -7,9 +7,17 @@ import matter from '@11ty/gray-matter';
 
 import { neuronFrontmatterSchema } from '#lib/neuron/schema';
 
+import { readSource } from './sources';
 import { listNeuronFiles, NEURONS_DIR } from './store';
+import { readTopics } from './topics';
 
-export type LintIssueKind = 'dangling-synapse' | 'invalid-frontmatter' | 'isolated-neuron';
+export type LintIssueKind =
+    | 'dangling-synapse'
+    | 'invalid-frontmatter'
+    | 'invalid-lifecycle'
+    | 'invalid-source'
+    | 'unknown-region'
+    | 'invalid-regions';
 
 export interface LintIssue {
     fileName: string;
@@ -21,6 +29,12 @@ export interface LintIssue {
 export async function lintNeurons(): Promise<LintIssue[]> {
     const fileNames = await listNeuronFiles();
     const issues: LintIssue[] = [];
+    let topicIds: Set<string>;
+    try {
+        topicIds = new Set((await readTopics()).map((topic) => topic.id));
+    } catch (error) {
+        return [{ fileName: 'topics.json', kind: 'invalid-regions', message: String(error) }];
+    }
     const validNeurons = new Map<string, NeuronFrontmatter>();
 
     for (const fileName of fileNames) {
@@ -39,12 +53,27 @@ export async function lintNeurons(): Promise<LintIssue[]> {
             continue;
         }
 
+        if (`${result.data.id}.md` !== fileName) {
+            issues.push({
+                fileName,
+                kind: 'invalid-frontmatter',
+                message: 'Neuron ID does not match filename',
+            });
+            continue;
+        }
         validNeurons.set(result.data.id, result.data);
+        for (const id of result.data.topics) {
+            if (!topicIds.has(id))
+                issues.push({
+                    fileName,
+                    kind: 'unknown-region',
+                    message: `Unknown region "${id}"`,
+                    neuronId: result.data.id,
+                });
+        }
     }
 
     const validIds = new Set(validNeurons.keys());
-    const hasOutgoing = new Set<string>();
-    const hasIncoming = new Set<string>();
 
     for (const neuron of validNeurons.values()) {
         for (const synapse of neuron.synapses) {
@@ -57,20 +86,46 @@ export async function lintNeurons(): Promise<LintIssue[]> {
                 });
                 continue;
             }
-
-            hasOutgoing.add(neuron.id);
-            hasIncoming.add(synapse.target);
         }
     }
 
     for (const neuron of validNeurons.values()) {
-        if (!hasOutgoing.has(neuron.id) && !hasIncoming.has(neuron.id)) {
+        let message = '';
+        if ((neuron.lifecycle === 'superseded') !== Boolean(neuron.supersededBy))
+            message = 'Invalid replacement state';
+        const visited = new Set([neuron.id]);
+        let replacement = neuron.supersededBy;
+        while (replacement) {
+            if (visited.has(replacement)) {
+                message = 'Supersession cycle';
+                break;
+            }
+            visited.add(replacement);
+            const target = validNeurons.get(replacement);
+            if (!target) {
+                message = `Unknown replacement: ${replacement}`;
+                break;
+            }
+            replacement = target.supersededBy;
+        }
+        if (message)
             issues.push({
                 fileName: `${neuron.id}.md`,
-                kind: 'isolated-neuron',
-                message: `Neuron "${neuron.title}" has no outgoing or incoming synapses`,
+                kind: 'invalid-lifecycle',
+                message,
                 neuronId: neuron.id,
             });
+        for (const id of neuron.sources) {
+            try {
+                await readSource(id);
+            } catch (error) {
+                issues.push({
+                    fileName: `${neuron.id}.md`,
+                    kind: 'invalid-source',
+                    message: String(error),
+                    neuronId: neuron.id,
+                });
+            }
         }
     }
 

@@ -12,6 +12,12 @@ export const neurons = sqliteTable('neurons', {
     filePath: text('file_path').notNull(),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    aliases: text('aliases', { mode: 'json' }).$type<string[]>().notNull().default([]),
+    topics: text('topics', { mode: 'json' }).$type<string[]>().notNull().default([]),
+    sources: text('sources', { mode: 'json' }).$type<string[]>().notNull().default([]),
+    lifecycle: text('lifecycle').notNull().default('active'),
+    supersededBy: text('superseded_by'),
+    revision: text('revision').notNull().default(''),
 });
 
 export const synapses = sqliteTable('synapses', {

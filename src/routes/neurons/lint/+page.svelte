@@ -12,8 +12,11 @@
 
     const SEVERITY: Record<LintIssueKind, BadgeVariant> = {
         'dangling-synapse': 'destructive',
+        'unknown-region': 'destructive',
+        'invalid-regions': 'destructive',
         'invalid-frontmatter': 'destructive',
-        'isolated-neuron': 'secondary',
+        'invalid-lifecycle': 'destructive',
+        'invalid-source': 'destructive',
     };
 </script>
 

@@ -8,6 +8,13 @@
       "when": 1793699818917,
       "tag": "0000_slimy_screwball",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793865264373,
+      "tag": "0001_glossy_wrecker",
+      "breakpoints": true
     }
   ]
 }
