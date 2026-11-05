@@ -8,13 +8,62 @@ Use Node.js >=24 and the pnpm version in `package.json`.
 
 ```sh
 pnpm install
+mkdir -p "$HOME/.neuron404/content/neurons"
 cp .env.example .env
+```
+
+Data paths are detected automatically. Local development and Docker share `~/.neuron404/content/` and `~/.neuron404/neuron404.db`. Set `NEURON404_UID` and `NEURON404_GID` to the output of `id -u` and `id -g` when they differ from 1000, so container writes remain accessible to your local user. Then initialize the database and start development:
+
+```sh
 pnpm db:migrate
 pnpm db:index
 pnpm dev
 ```
 
 `pnpm check`, `pnpm lint`, `pnpm format`, and `pnpm build` verify the application. `pnpm neuron:lint` checks stored structure and source integrity. There is no test runner configured.
+
+## Docker
+
+Install Docker with Compose v2, then run these commands from the repository:
+
+```sh
+mkdir -p "$HOME/.neuron404"
+docker compose up -d --build
+```
+
+Open `http://localhost:3000/neurons`. Both the image and container are named `neuron404`. The image builds a standalone production server with [SvelteKit's Node adapter](https://svelte.dev/docs/kit/adapter-node). Compose binds the port to the local machine and mounts `~/.neuron404` at `/data`:
+
+| Host path                   | Container path       | Purpose                                                    |
+| --------------------------- | -------------------- | ---------------------------------------------------------- |
+| `~/.neuron404/content/`     | `/data/content/`     | Neurons, sources, history, regions, and operation receipts |
+| `~/.neuron404/neuron404.db` | `/data/neuron404.db` | Derived SQLite index and migration state                   |
+
+The image excludes personal content, local databases, and `.env` files. Startup applies committed migrations and synchronizes the index before accepting requests. A new volume starts empty. Rebuilding the image or running `docker compose down` preserves the host directory. Back up the entire directory with the container stopped to capture consistent files.
+
+`GET /healthz` returns `200` with `{"status":"ok"}` when SQLite responds and the content directory is readable and writable; otherwise it returns `503` with `{"status":"error"}`. Responses are not cached. Compose uses this endpoint for its healthcheck.
+
+To change the host port, run `NEURON404_PORT=8765 docker compose up -d`. On Linux, if your user is not UID/GID 1000, pass `NEURON404_UID=$(id -u) NEURON404_GID=$(id -g)` before Compose commands that start containers so the process can write to your directory. Keep these overrides consistent when recreating containers.
+
+### Import existing local knowledge
+
+When upgrading from repository-local `content/`, stop other writers and copy that directory into an empty destination before the first Docker startup:
+
+```sh
+mkdir -p "$HOME/.neuron404"
+test ! -e "$HOME/.neuron404/content" && cp -Rp content "$HOME/.neuron404/content"
+docker compose up -d --build
+```
+
+This retains the repository's original files. SQLite is rebuilt from the copied Markdown, so copying `local.db` is unnecessary. If the destination already contains content, the copy command deliberately does nothing; do not merge independent stores by overwriting files. The repository CLI automatically uses the same store. You can also invoke the container CLI:
+
+```sh
+docker compose exec -T neuron404 node --import tsx scripts/neuron.ts catalog
+docker compose exec -T neuron404 node --import tsx scripts/neuron.ts search "runtime defaults"
+docker compose logs -f neuron404
+docker compose down
+```
+
+For `add`, `update`, and `source:add`, pipe JSON into the same `exec -T` command. Rebuild after updating the code with `docker compose up -d --build`.
 
 ## Terminology
 
@@ -30,6 +79,8 @@ pnpm dev
 - SQLite: derived neuron, relation, and full-text indexes. Rebuild from Markdown with `pnpm neuron index --rebuild`.
 
 Personal content and databases are ignored by Git. Application Git history is not a backup of personal knowledge. Keep private backups of the content directory; rebuilding SQLite cannot recreate lost source files or neuron revisions.
+
+Local web and CLI commands derive the data directory from the operating system home directory: `~/.neuron404`. SQLite is always `neuron404.db` and knowledge files are under `content/` in that directory. No path configuration is required. Docker sets `NEURON404_DATA_DIR=/data` internally to use its bind mount; this optional root override also supports other deployment locations.
 
 Existing Markdown remains valid without aliases, structured sources, or lifecycle fields. Its default lifecycle is `active`, which does not imply verified or current knowledge. The storage refactor does not rewrite legacy bodies, invent source snapshots, or infer replacements.
 
@@ -65,4 +116,10 @@ Search uses weighted BM25 over titles, aliases, and bodies, with optional region
 
 Writes use a storage lock, immutable revision snapshots, and atomic file replacement. Index synchronization updates changed rows in a transaction. If a file was saved but subsequent processing failed, read the neuron identified by the error before retrying, then run `pnpm neuron index`. A leftover `content/.write-lock` after a crash must be checked against its recorded PID before removal; never remove a live writer's lock.
 
-The repository-local skill is `.claude/skills/neuron404/SKILL.md`. Other projects can configure `NEURON404_HOME` to this repository and call `"$NEURON404_HOME/bin/neuron404"`. Skills provide workflow instructions, not storage. Each chat client still needs permission and a tool capable of reaching the same store. No global skill installation, remote hosting, MCP server, embedding model, or additional LLM provider is configured by this project.
+The portable skill source is [skills/neuron404/SKILL.md](skills/neuron404/SKILL.md). It loads only the workflow reference needed for retrieval, maintenance, or verification and delegates to the existing CLI through `skills/neuron404/scripts/neuron404`.
+
+Claude's global entry at `~/.claude/skills/neuron404` and Codex's global entry at `~/.agents/skills/neuron404` are symlinks to this repository's `skills/neuron404/`. The launcher resolves that link to locate the repository from any working directory; `NEURON404_HOME` can explicitly select another repository. The project-local `.claude/skills/neuron404/` copy has been removed.
+
+The user authorizes improving this skill during actual use. Keep the repository directory as the canonical source: changes made through either global link already update the project and the other client. Resolve links before editing and preserve this setup instead of creating independent copies. If the repository moves, update both links. Do not include personal knowledge or local transcripts in skill changes, modify unrelated client settings, or commit automatically.
+
+Global discovery applies to local clients with access to these paths. It does not provide cloud access, remote hosting, an MCP server, or an additional LLM provider; each client still needs tool access to the same store.
