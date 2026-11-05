@@ -14,7 +14,7 @@ const config: Config = {
         'prettier-plugin-tailwindcss',
     ],
     overrides: [
-        { files: '*.svelte', options: { parser: 'svelte' } },
+        { files: '*.svelte', options: { parser: 'svelte', htmlWhitespaceSensitivity: 'ignore' } },
         { files: ['*.yml', '*.yaml'], options: { tabWidth: 2 } },
     ],
     tailwindStylesheet: './src/routes/layout.css',
