@@ -31,7 +31,7 @@
 
     const NAV_ITEMS = [
         { href: '/neurons', label: 'Neurons' },
-        { href: '/neurons/graph', label: 'Graph' },
+        { href: '/neurons/network', label: 'Network' },
     ] as const;
 
     function isActive(href: string): boolean {
@@ -39,7 +39,7 @@
             return (
                 page.url.pathname === '/neurons' ||
                 (page.url.pathname.startsWith('/neurons/') &&
-                    !page.url.pathname.startsWith('/neurons/graph') &&
+                    !page.url.pathname.startsWith('/neurons/network') &&
                     !page.url.pathname.startsWith('/neurons/lint') &&
                     !page.url.pathname.startsWith('/neurons/new'))
             );
