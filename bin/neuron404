@@ -1,4 +1,5 @@
 #!/bin/sh
 set -eu
 NEURON404_ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-exec pnpm --dir "$NEURON404_ROOT" run neuron "$@"
+cd "$NEURON404_ROOT"
+exec pnpm run neuron "$@"
