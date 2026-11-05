@@ -1,3 +1,5 @@
+import './env';
+
 import process from 'node:process';
 
 import { newNeuronInputSchema, updateNeuronInputSchema } from '#lib/neuron/schema';
@@ -8,8 +10,6 @@ import { lintNeurons } from '#lib/server/neuron/lint';
 import { readCatalog, readNeuronContext, readNeuronHistory } from '#lib/server/neuron/read';
 import { searchNeurons } from '#lib/server/neuron/search';
 import { readSource, saveSource } from '#lib/server/neuron/sources';
-
-import './env';
 
 async function readPayload() {
     const chunks: Buffer[] = [];
@@ -45,7 +45,7 @@ try {
         result = await lintNeurons();
         if ((result as unknown[]).length) process.exitCode = 1;
     } else if (['add', 'update', 'search', 'index'].includes(command)) {
-        const db = createDb(process.env.DATABASE_URL ?? '');
+        const db = createDb();
         if (command === 'add' || command === 'update') {
             const saved =
                 command === 'add'

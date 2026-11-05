@@ -30,7 +30,9 @@ export default defineConfig(
                 'error',
                 {
                     newlinesBetween: 1,
+                    customGroups: [{ groupName: 'environment', elementNamePattern: '^\\./env$' }],
                     groups: [
+                        'environment',
                         'type-import',
                         'value-builtin',
                         'value-external',

@@ -2,7 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { link, mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-export const CONTENT_DIR = path.resolve(import.meta.dirname, '../../../../content');
+import { CONTENT_DIR } from '../data-dir';
+
+export { CONTENT_DIR };
 
 export function fingerprint(content: string) {
     return createHash('sha256').update(content).digest('hex');

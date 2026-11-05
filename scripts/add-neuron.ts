@@ -1,10 +1,12 @@
+import './env';
+
+import path from 'node:path';
 import process from 'node:process';
 
 import { newNeuronInputSchema } from '#lib/neuron/schema';
 import { createDb } from '#lib/server/db/client';
 import { createNeuron } from '#lib/server/neuron/create';
-
-import './env';
+import { NEURONS_DIR } from '#lib/server/neuron/store';
 
 async function readStdin(): Promise<string> {
     const chunks: Buffer[] = [];
@@ -41,10 +43,7 @@ if (!parsed.success) {
     process.exit(1);
 }
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error('DATABASE_URL is not set');
-
-const db = createDb(databaseUrl);
+const db = createDb();
 const neuron = await createNeuron(db, parsed.data);
 
 console.log(
@@ -53,7 +52,7 @@ console.log(
             id: neuron.id,
             title: neuron.title,
             revision: neuron.revision,
-            filePath: `content/neurons/${neuron.id}.md`,
+            filePath: path.join(NEURONS_DIR, `${neuron.id}.md`),
         },
         null,
         2,

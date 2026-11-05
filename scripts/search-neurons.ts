@@ -1,10 +1,10 @@
+import './env';
+
 import process from 'node:process';
 
 import { createDb } from '#lib/server/db/client';
 import { synchronizeIndex } from '#lib/server/neuron/indexer';
 import { searchNeurons } from '#lib/server/neuron/search';
-
-import './env';
 
 const query = process.argv[2];
 if (!query) {
@@ -14,10 +14,7 @@ if (!query) {
 
 const limit = Number(process.argv[3]) || 10;
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error('DATABASE_URL is not set');
-
-const db = createDb(databaseUrl);
+const db = createDb();
 await synchronizeIndex(db);
 const results = await searchNeurons(db, query, limit);
 

@@ -1,3 +1,5 @@
+import './env';
+
 import process from 'node:process';
 
 import { lintNeurons } from '#lib/server/neuron/lint';
