@@ -10,7 +10,13 @@ Use the skill launcher described in `SKILL.md`. Distinguish structural integrity
 
 ## Content verification
 
-For a requested claim, use search and `read` to identify the actual neuron and its caution context. Read its cited evidence with `source:read`. There is no CLI operation that automatically grades factual correctness.
+For a requested claim, use search and `read` to identify the actual neuron, caution context, and attached `reviews`. Read its cited evidence with `source:read`. `review:reports` lists the latest stored reviews; `review:read ID` reads an immutable report, including the exact input revisions and evidence quotes. Reports assess fidelity to supplied evidence, not independent real-world truth.
+
+Background maintenance is disabled unless `NEURON404_MAINTENANCE_PROVIDER` explicitly selects an adapter. Claude and Codex implement the shared `MaintenanceAgentAdapter` interface; neither is selected automatically. Do not enable a provider as a side effect of retrieval or review.
+
+The optional host maintenance worker performs source audits and independently checks Region overview candidates before publishing. Knowledge reviews cover Region members, direct semantic neighbors/replacements, and a small set of title/alias candidates; they are not exhaustive all-pairs checks. Missing or inaccessible source snapshots mean unverifiable, not false. Findings about contradictions, duplication, missing concepts, or proposed synapses are suggestions and do not edit neurons.
+
+Check report freshness, its coverage, and individual finding decisions. Unresolved findings are carried into later knowledge reports rather than silently disappearing. A carried finding retains its origin report and may need reassessment against changed knowledge. Do not interpret a successful worker job, `stale: false`, or a passing fidelity check as proof that a source is correct. Ordinary retrieval must not start maintenance or trigger model calls.
 
 Compare the claim with its evidence: does the source support the same subject, version, date, conditions, and degree of certainty? Note unsupported details, omitted limitations, reasoning presented as observation, and later contradictions or replacements. Separate a faithful account of a source from independent confirmation that the source is correct.
 
