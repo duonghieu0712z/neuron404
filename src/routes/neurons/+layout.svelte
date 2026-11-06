@@ -4,6 +4,7 @@
     import XIcon from '@lucide/svelte/icons/x';
 
     import NeuronDetail from '#lib/components/neuron-detail.svelte';
+    import RegionOverview from '#lib/components/region-overview.svelte';
     import { Button } from '#lib/components/ui/button';
     import { ScrollArea } from '#lib/components/ui/scroll-area';
     import {
@@ -20,7 +21,7 @@
 
     function handleWindowClick(event: MouseEvent) {
         if (panel.consumeTrigger()) return;
-        if (!panel.selected) return;
+        if (!panel.selected && !panel.region) return;
 
         const target = event.target as HTMLElement | null;
         if (target?.closest('[data-slot="sidebar-inner"]')) return;
@@ -33,7 +34,7 @@
 <svelte:window onclick={handleWindowClick} />
 
 <SidebarProvider
-    open={!!panel.selected}
+    open={!!panel.selected || !!panel.region}
     onOpenChange={(open) => {
         if (!open) panel.close();
     }}
@@ -45,15 +46,15 @@
     </ScrollArea>
 
     <Sidebar side="right" class="top-14 bottom-0 h-auto">
-        {#if panel.selected}
+        {#if panel.selected || panel.region}
             <SidebarHeader class="flex-row items-center justify-between border-b">
                 <h2 class="min-w-0 truncate text-sm font-semibold">
-                    {panel.selected.neuron.title}
+                    {panel.region?.region.title ?? panel.selected?.neuron.title}
                 </h2>
                 <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Close neuron details"
+                    aria-label="Close details"
                     onclick={panel.close}
                 >
                     <XIcon class="size-4" />
@@ -62,11 +63,15 @@
             <SidebarContent class="overflow-hidden">
                 <ScrollArea class="min-h-0 flex-1">
                     <div class="p-4">
-                        <NeuronDetail
-                            data={panel.selected}
-                            layout="panel"
-                            onSelectNeuron={panel.open}
-                        />
+                        {#if panel.region}
+                            <RegionOverview data={panel.region} onSelectNeuron={panel.open} />
+                        {:else if panel.selected}
+                            <NeuronDetail
+                                data={panel.selected}
+                                layout="panel"
+                                onSelectNeuron={panel.open}
+                            />
+                        {/if}
                     </div>
                 </ScrollArea>
             </SidebarContent>
