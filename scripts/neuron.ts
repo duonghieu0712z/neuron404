@@ -8,6 +8,7 @@ import { createNeuron, updateNeuron } from '#lib/server/neuron/create';
 import { rebuildIndex, synchronizeIndex } from '#lib/server/neuron/indexer';
 import { lintNeurons } from '#lib/server/neuron/lint';
 import { readCatalog, readNeuronContext, readNeuronHistory } from '#lib/server/neuron/read';
+import { readRegionOverview, writeRegionOverview } from '#lib/server/neuron/region-overview';
 import { searchNeurons } from '#lib/server/neuron/search';
 import { readSource, saveSource } from '#lib/server/neuron/sources';
 import { addRegion } from '#lib/server/neuron/topics';
@@ -33,6 +34,9 @@ try {
     else if (command === 'history') result = await readNeuronHistory(args[0], args[1]);
     else if (command === 'catalog') result = await readCatalog();
     else if (command === 'region:add') result = await addRegion(await readPayload());
+    else if (command === 'region:read') result = await readRegionOverview(args[0]);
+    else if (command === 'region:write')
+        result = await writeRegionOverview(args[0], await readPayload());
     else if (command === 'source:add') {
         const saved = await saveSource(await readPayload());
         result = {
@@ -80,7 +84,7 @@ try {
         }
     } else {
         throw new Error(
-            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--include-history]|read ID...|history ID [REVISION]|catalog|region:add|source:add|source:read ID|index [--rebuild]|lint>',
+            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--include-history]|read ID...|history ID [REVISION]|catalog|region:add|region:read ID|region:write ID|source:add|source:read ID|index [--rebuild]|lint>',
         );
     }
     console.log(JSON.stringify(result, null, 2));
