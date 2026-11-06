@@ -8,11 +8,20 @@ import { classifiedNeuronInputSchema, updateNeuronInputSchema } from '#lib/neuro
 import { createDb } from '#lib/server/db/client';
 import { listReviewReports, readReport } from '#lib/server/maintenance/reports';
 import { createNeuron, updateNeuron } from '#lib/server/neuron/create';
-import { rebuildIndex, synchronizeIndex } from '#lib/server/neuron/indexer';
+import { ensureIndex, rebuildIndex, synchronizeIndex } from '#lib/server/neuron/indexer';
 import { lintNeurons } from '#lib/server/neuron/lint';
 import { migrateRegionStorage } from '#lib/server/neuron/migrate-regions';
-import { readCatalog, readNeuronContext, readNeuronHistory } from '#lib/server/neuron/read';
-import { readRegionOverview, writeRegionOverview } from '#lib/server/neuron/region-overview';
+import {
+    readCatalog,
+    readNeighbors,
+    readNeuronContext,
+    readNeuronHistory,
+} from '#lib/server/neuron/read';
+import {
+    readRegionOverview,
+    readRegionSummary,
+    writeRegionOverview,
+} from '#lib/server/neuron/region-overview';
 import { addRegion } from '#lib/server/neuron/regions';
 import { searchNeurons } from '#lib/server/neuron/search';
 import { readSource, saveSource } from '#lib/server/neuron/sources';
@@ -35,14 +44,31 @@ function option(name: string) {
 try {
     let result: unknown;
     if (command === 'read') result = await readNeuronContext(args);
+    else if (command === 'neighbors')
+        result = await readNeighbors(args[0], {
+            limit: Number(option('--limit') ?? 20),
+            offset: Number(option('--offset') ?? 0),
+            kind: option('--kind'),
+            direction: option('--direction'),
+        });
     else if (command === 'history') result = await readNeuronHistory(args[0], args[1]);
-    else if (command === 'catalog') result = await readCatalog();
+    else if (command === 'catalog')
+        result = await readCatalog({
+            region: option('--region'),
+            query: option('--query'),
+            limit: Number(option('--limit') ?? 20),
+            offset: Number(option('--offset') ?? 0),
+            includeHistory: args.includes('--include-history'),
+        });
     else if (command === 'review:reports') result = await listReviewReports();
     else if (command === 'review:read') {
         result = await readReport(args[0]);
         if (!result) throw new Error('Review report not found.');
     } else if (command === 'region:add') result = await addRegion(await readPayload());
-    else if (command === 'region:read') result = await readRegionOverview(args[0]);
+    else if (command === 'region:read')
+        result = args.includes('--summary')
+            ? await readRegionSummary(args[0])
+            : await readRegionOverview(args[0]);
     else if (command === 'region:write')
         result = await writeRegionOverview(args[0], await readPayload());
     else if (command === 'source:add') {
@@ -91,15 +117,16 @@ try {
             const limit = Number(option('--limit') ?? 10);
             if (!Number.isInteger(limit) || limit < 1 || limit > 50)
                 throw new Error('Limit must be an integer from 1 to 50');
-            await synchronizeIndex(db);
+            await ensureIndex(db);
             result = await searchNeurons(db, args[0] ?? '', limit, {
                 region: option('--region'),
+                offset: Number(option('--offset') ?? 0),
                 includeHistory: args.includes('--include-history'),
             });
         }
     } else {
         throw new Error(
-            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--include-history]|read ID...|history ID [REVISION]|catalog|region:add|region:read ID|region:write ID|review:reports|review:read ID|source:add|source:read ID|index [--rebuild]|migrate|lint>',
+            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--offset N] [--include-history]|read ID...|neighbors ID [--kind KIND] [--direction incoming|outgoing|both] [--limit N] [--offset N]|history ID [REVISION]|catalog [--query QUERY] [--region ID] [--limit N] [--offset N]|region:add|region:read ID|region:write ID|review:reports|review:read ID|source:add|source:read ID|index [--rebuild]|migrate|lint>',
         );
     }
     console.log(JSON.stringify(result, null, 2));

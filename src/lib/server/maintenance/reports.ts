@@ -1,4 +1,6 @@
 import type { ReviewReport, ReviewView } from '#lib/neuron/review';
+import type { Db } from '#lib/server/db/client';
+import type { IndexSnapshot } from '#lib/server/neuron/indexed-store';
 
 import { appendFile, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -9,10 +11,10 @@ import { z } from 'zod';
 import { reviewFindingSchema, reviewOutputSchema } from '#lib/neuron/review';
 import { regionIdSchema } from '#lib/neuron/schema';
 import { DATA_DIR } from '#lib/server/data-dir';
+import { readIndexSnapshots, withIndexedStore } from '#lib/server/neuron/indexed-store';
 import { readRegions } from '#lib/server/neuron/regions';
 import { readSource } from '#lib/server/neuron/sources';
 import { atomicWrite, CONTENT_DIR, fingerprint, withStorageLock } from '#lib/server/neuron/storage';
-import { listNeuronFiles, readNeuronSnapshot } from '#lib/server/neuron/store';
 
 const hashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const revisionsSchema = z.record(z.string(), hashSchema);
@@ -216,7 +218,8 @@ export async function decideFinding(
 
 export async function readRegionReviews(
     regionId: string,
-    snapshots?: Awaited<ReturnType<typeof readNeuronSnapshot>>[],
+    snapshots?: IndexSnapshot[],
+    db?: Db,
 ): Promise<ReviewView[]> {
     const reports = (
         await Promise.all(
@@ -224,9 +227,16 @@ export async function readRegionReviews(
         )
     ).filter((report) => report !== null);
     if (!reports.length) return [];
-    snapshots ??= await Promise.all(
-        (await listNeuronFiles()).map((name) => readNeuronSnapshot(name.slice(0, -3))),
-    );
+    if (!snapshots) {
+        if (!db) return withIndexedStore((store) => readRegionReviews(regionId, undefined, store));
+        const members = await readIndexSnapshots(db, { region: regionId });
+        const context = await readIndexSnapshots(db, {
+            ids: [...new Set(reports.flatMap((report) => Object.keys(report.context)))],
+        });
+        snapshots = [
+            ...new Map([...members, ...context].map((item) => [item.neuron.id, item])).values(),
+        ];
+    }
     const byId = new Map(snapshots.map((item) => [item.neuron.id, item]));
     const members = snapshots.filter(({ neuron }) => neuron.regions.includes(regionId));
     const region = (await readRegions()).find((item) => item.id === regionId);
@@ -235,7 +245,7 @@ export async function readRegionReviews(
         path.join(CONTENT_DIR, 'regions', `${regionIdSchema.parse(regionId)}.md`),
     );
     const overviewHash =
-        overviewRaw === null ? null : fingerprint(matter(overviewRaw).content.trim());
+        overviewRaw === null ? null : fingerprint(matter(overviewRaw, {}).content.trim());
     const unavailable = new Set<string>();
     for (const id of new Set(reports.flatMap((report) => report.sources))) {
         try {

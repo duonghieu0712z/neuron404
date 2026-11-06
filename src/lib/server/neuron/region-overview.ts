@@ -1,3 +1,7 @@
+import type { ReviewView } from '#lib/neuron/review';
+import type { Region } from '#lib/neuron/schema';
+import type { Db } from '#lib/server/db/client';
+
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -5,11 +9,13 @@ import matter from '@11ty/gray-matter';
 import { z } from 'zod';
 
 import { regionIdSchema } from '#lib/neuron/schema';
+import { createDb } from '#lib/server/db/client';
 import { readRegionReviews } from '#lib/server/maintenance/reports';
 
+import { readIndexSnapshots, withIndexedStore, type IndexSnapshot } from './indexed-store';
+import { INDEX_RECHECK_MS, synchronizeIndexUnlocked } from './indexer';
 import { readRegions } from './regions';
 import { atomicWrite, CONTENT_DIR, fingerprint, withStorageLock } from './storage';
-import { listNeuronFiles, readNeuronSnapshot } from './store';
 
 const revisionSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const membersSchema = z.record(z.string(), revisionSchema);
@@ -44,22 +50,35 @@ async function readRaw(id: string) {
     }
 }
 
+export interface RegionOverview {
+    region: Region;
+    body: string;
+    revision: string | null;
+    updated: string | null;
+    memberRevisions: Record<string, string>;
+    stale: boolean;
+    neurons: { id: string; title: string }[];
+    reviews: ReviewView[];
+}
+
 export async function readRegionOverview(
     id: string,
-    snapshots?: Awaited<ReturnType<typeof readNeuronSnapshot>>[],
-) {
+    snapshots?: IndexSnapshot[],
+    db?: Db,
+): Promise<RegionOverview> {
     regionIdSchema.parse(id);
     const region = (await readRegions()).find((item) => item.id === id);
     if (!region) throw new Error(`Unknown region: ${id}`);
-    snapshots ??= await Promise.all(
-        (await listNeuronFiles()).map((name) => readNeuronSnapshot(name.slice(0, -3))),
-    );
+    if (!snapshots) {
+        if (!db) return withIndexedStore((store) => readRegionOverview(id, undefined, store));
+        snapshots = await readIndexSnapshots(db, { region: id });
+    }
     const members = snapshots.filter(({ neuron }) => neuron.regions.includes(id));
     const memberRevisions = Object.fromEntries(
         members.map(({ neuron, revision }) => [neuron.id, revision]),
     );
     const raw = await readRaw(id);
-    const parsed = raw === null ? null : matter(raw);
+    const parsed = raw === null ? null : matter(raw, {});
     const metadata = parsed ? metadataSchema.parse(parsed.data) : null;
     if (metadata && metadata.region !== id) throw new Error('Region overview ID mismatch');
     return {
@@ -70,15 +89,51 @@ export async function readRegionOverview(
         memberRevisions,
         stale: metadata !== null && !sameMembers(metadata.members, memberRevisions),
         neurons: members.map(({ neuron }) => ({ id: neuron.id, title: neuron.title })),
-        reviews: await readRegionReviews(id, snapshots),
+        reviews: await readRegionReviews(id, db ? undefined : snapshots, db),
     };
 }
 
-export type RegionOverview = Awaited<ReturnType<typeof readRegionOverview>>;
+export async function readRegionSummary(id: string) {
+    regionIdSchema.parse(id);
+    return withIndexedStore(async (db) => {
+        const region = (await readRegions()).find((item) => item.id === id);
+        if (!region) throw new Error(`Unknown region: ${id}`);
+        const members = await readIndexSnapshots(db, { region: id });
+        const raw = await readRaw(id);
+        const parsed = raw === null ? null : matter(raw, {});
+        const metadata = parsed ? metadataSchema.parse(parsed.data) : null;
+        if (metadata && metadata.region !== id) throw new Error('Region overview ID mismatch');
+        return {
+            region,
+            body: parsed?.content.trim() ?? '',
+            revision: raw === null ? null : fingerprint(raw),
+            updated: metadata?.updated ?? null,
+            memberCount: members.length,
+            stale:
+                metadata !== null &&
+                !sameMembers(
+                    metadata.members,
+                    Object.fromEntries(
+                        members.map(({ neuron, revision }) => [neuron.id, revision]),
+                    ),
+                ),
+        };
+    });
+}
 
 export async function writeRegionOverviewUnlocked(id: string, payload: unknown) {
+    const db = createDb();
+    try {
+        await synchronizeIndexUnlocked(db, false, INDEX_RECHECK_MS);
+        return await writeIndexedOverview(db, id, payload);
+    } finally {
+        db.$client.close();
+    }
+}
+
+async function writeIndexedOverview(db: Db, id: string, payload: unknown) {
     const input = inputSchema.parse(payload);
-    const current = await readRegionOverview(id);
+    const current = await readRegionOverview(id, undefined, db);
     if (current.revision !== input.expectedRevision)
         throw new Error('Region overview revision conflict. Read region:read before retrying.');
     if (!sameMembers(current.memberRevisions, input.memberRevisions))
@@ -104,7 +159,7 @@ export async function writeRegionOverviewUnlocked(id: string, payload: unknown) 
     });
     await atomicWrite(overviewPath(id), raw);
     await atomicWrite(path.join(history, `${fingerprint(raw)}.md`), raw, true);
-    return readRegionOverview(id);
+    return readRegionOverview(id, undefined, db);
 }
 
 export async function writeRegionOverview(id: string, payload: unknown) {

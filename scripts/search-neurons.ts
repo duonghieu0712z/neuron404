@@ -3,7 +3,7 @@ import './env';
 import process from 'node:process';
 
 import { createDb } from '#lib/server/db/client';
-import { synchronizeIndex } from '#lib/server/neuron/indexer';
+import { ensureIndex } from '#lib/server/neuron/indexer';
 import { searchNeurons } from '#lib/server/neuron/search';
 
 const query = process.argv[2];
@@ -15,7 +15,7 @@ if (!query) {
 const limit = Number(process.argv[3]) || 10;
 
 const db = createDb();
-await synchronizeIndex(db);
+await ensureIndex(db);
 const results = await searchNeurons(db, query, limit);
 
 if (results.length === 0) {

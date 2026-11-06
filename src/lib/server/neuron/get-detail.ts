@@ -5,19 +5,25 @@ import { db } from '#lib/server/db';
 import { neurons, synapses } from '#lib/server/db/schema';
 import { readRegionReviews } from '#lib/server/maintenance/reports';
 
-import { synchronizeIndexUnlocked } from './indexer';
+import { readIndexedNeuron } from './indexed-store';
+import { INDEX_RECHECK_MS, synchronizeIndexUnlocked } from './indexer';
 import { readRegions } from './regions';
 import { readSource } from './sources';
 import { withStorageLock } from './storage';
-import { readNeuronFile } from './store';
 
 export type NeuronDetail = Awaited<ReturnType<typeof getNeuronDetail>>;
 
 export async function getNeuronDetail(id: string) {
     return withStorageLock(async () => {
-        await synchronizeIndexUnlocked(db);
-        const neuron = await db.query.neurons.findFirst({ where: eq(neurons.id, id) });
+        await synchronizeIndexUnlocked(db, false, INDEX_RECHECK_MS);
+        let neuron = await db.query.neurons.findFirst({ where: eq(neurons.id, id) });
         if (!neuron) throw error(404, 'Neuron not found');
+        const snapshot = await readIndexedNeuron(db, id);
+        if (snapshot.revision !== neuron.revision) {
+            neuron = await db.query.neurons.findFirst({ where: eq(neurons.id, id) });
+            if (!neuron) throw error(404, 'Neuron not found');
+        }
+        const source = snapshot.neuron;
 
         const outgoing = await db
             .select({ id: synapses.id, kind: synapses.kind, note: synapses.note, target: neurons })
@@ -31,10 +37,7 @@ export async function getNeuronDetail(id: string) {
             .innerJoin(neurons, eq(neurons.id, synapses.sourceNeuronId))
             .where(eq(synapses.targetNeuronId, id));
 
-        const [source, catalog] = await Promise.all([
-            readNeuronFile(neuron.filePath),
-            readRegions(),
-        ]);
+        const catalog = await readRegions();
         const regions = catalog.filter((region) => source.regions.includes(region.id));
         const sources = (await Promise.all(source.sources.map(readSource))).map(
             ({ id, capturedAt, source: { title, uri, locator } }) => ({
@@ -43,7 +46,9 @@ export async function getNeuronDetail(id: string) {
                 source: { title, uri, locator },
             }),
         );
-        const reviews = (await Promise.all(regions.map((region) => readRegionReviews(region.id))))
+        const reviews = (
+            await Promise.all(regions.map((region) => readRegionReviews(region.id, undefined, db)))
+        )
             .flat()
             .filter((report) => report.kind === 'knowledge')
             .map((report) => ({

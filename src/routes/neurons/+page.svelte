@@ -1,37 +1,16 @@
 <script lang="ts">
     import type { PageProps } from './$types';
 
-    import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
-    import { SvelteURLSearchParams } from 'svelte/reactivity';
 
     import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
-    import { Input } from '#lib/components/ui/input';
-    import { Label } from '#lib/components/ui/label';
     import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
     let { data }: PageProps = $props();
 
     const panel = getNeuronPanelContext();
-
-    let searchValue = $derived(data.query);
-    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-
-    function handleSearchInput(event: Event) {
-        searchValue = (event.currentTarget as HTMLInputElement).value;
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            const params = new SvelteURLSearchParams();
-            if (searchValue) params.set('q', searchValue);
-            const query = params.toString();
-            void goto(`${resolve('/neurons')}${query ? `?${query}` : ''}`, {
-                replace: true,
-                reset: false,
-            });
-        }, 300);
-    }
 
     function handleClick(event: MouseEvent, id: string) {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -46,17 +25,6 @@
 
 <section class="w-full space-y-6 p-6">
     <h1 class="sr-only">Neurons</h1>
-
-    <div class="max-w-sm">
-        <Label for="q" class="sr-only">Search neurons</Label>
-        <Input
-            id="q"
-            type="search"
-            value={searchValue}
-            oninput={handleSearchInput}
-            placeholder="Search neurons..."
-        />
-    </div>
 
     {#if data.neurons.length === 0}
         <div class="flex flex-col items-start gap-3 rounded-sm border border-dashed p-8">

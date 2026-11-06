@@ -4,11 +4,11 @@ import { desc, inArray } from 'drizzle-orm';
 
 import { db } from '#lib/server/db';
 import { neurons } from '#lib/server/db/schema';
-import { synchronizeIndex } from '#lib/server/neuron/indexer';
+import { ensureIndex } from '#lib/server/neuron/indexer';
 import { searchNeurons } from '#lib/server/neuron/search';
 
 export const load: PageServerLoad = async ({ url }) => {
-    await synchronizeIndex(db);
+    await ensureIndex(db);
     const query = url.searchParams.get('q')?.trim() ?? '';
 
     const matches = query ? await searchNeurons(db, query, 50) : [];

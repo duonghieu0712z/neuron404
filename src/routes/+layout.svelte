@@ -3,14 +3,19 @@
 
     import ListChecksIcon from '@lucide/svelte/icons/list-checks';
     import MoonIcon from '@lucide/svelte/icons/moon';
+    import SearchIcon from '@lucide/svelte/icons/search';
     import SunIcon from '@lucide/svelte/icons/sun';
+    import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
     import { page } from '$app/state';
     import { ModeWatcher, toggleMode } from 'mode-watcher';
+    import { onDestroy } from 'svelte';
+    import { SvelteURLSearchParams } from 'svelte/reactivity';
 
     import iconDark from '#lib/assets/icon-dark.svg';
     import iconLight from '#lib/assets/icon-light.svg';
     import { Button } from '#lib/components/ui/button';
+    import { Input } from '#lib/components/ui/input';
     import {
         NavigationMenu,
         NavigationMenuItem,
@@ -33,6 +38,25 @@
         { href: '/neurons', label: 'Neurons' },
         { href: '/neurons/network', label: 'Network' },
     ] as const;
+
+    let searchValue = $derived(page.url.searchParams.get('q') ?? '');
+    let searchTimer: ReturnType<typeof setTimeout> | undefined;
+
+    function searchNeurons(event: Event) {
+        searchValue = (event.currentTarget as HTMLInputElement).value;
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            const params = new SvelteURLSearchParams();
+            if (searchValue.trim()) params.set('q', searchValue.trim());
+            const query = params.toString();
+            void goto(resolve(query ? `/neurons?${query}` : '/neurons'), {
+                replace: page.url.pathname === '/neurons',
+                reset: false,
+            });
+        }, 300);
+    }
+
+    onDestroy(() => clearTimeout(searchTimer));
 
     function isActive(href: string): boolean {
         if (href === '/neurons') {
@@ -63,7 +87,9 @@
     Skip to main content
 </a>
 
-<header class="sticky top-0 z-10 flex h-14 w-full items-center gap-6 border-b bg-background px-6">
+<header
+    class="sticky top-0 z-10 flex h-14 w-full items-center gap-2 border-b bg-background px-3 sm:gap-6 sm:px-6"
+>
     <a href={resolve('/neurons')} class="flex shrink-0 items-center gap-2 text-lg font-semibold">
         <img src={iconLight} alt="" class="size-6 dark:hidden" />
         <img src={iconDark} alt="" class="hidden size-6 dark:block" />
@@ -87,7 +113,20 @@
     </NavigationMenu>
 
     <TooltipProvider>
-        <div class="ml-auto flex items-center gap-2">
+        <div class="ml-auto flex min-w-0 items-center gap-2">
+            <div class="relative max-w-72 min-w-20 flex-1">
+                <SearchIcon
+                    class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                    type="search"
+                    aria-label="Search neurons"
+                    placeholder="Search neurons..."
+                    class="pl-9"
+                    value={searchValue}
+                    oninput={searchNeurons}
+                />
+            </div>
             <Button
                 href={resolve('/neurons/new')}
                 variant={isActive('/neurons/new') ? 'secondary' : 'default'}
