@@ -5,6 +5,7 @@ import { desc, inArray } from 'drizzle-orm';
 import { db } from '#lib/server/db';
 import { neurons } from '#lib/server/db/schema';
 import { ensureIndex } from '#lib/server/neuron/indexer';
+import { readRegions } from '#lib/server/neuron/regions';
 import { searchNeurons } from '#lib/server/neuron/search';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -29,5 +30,15 @@ export const load: PageServerLoad = async ({ url }) => {
             : []
         : await db.select().from(neurons).orderBy(desc(neurons.updatedAt));
 
-    return { neurons: rows, query };
+    const groups = (await readRegions())
+        .map(({ id, title }) => ({
+            id,
+            title,
+            neurons: rows.filter((neuron) => neuron.regions.includes(id)),
+        }))
+        .filter((group) => group.neurons.length > 0);
+    const unfiled = rows.filter((neuron) => neuron.regions.length === 0);
+    if (unfiled.length) groups.push({ id: 'region:unfiled', title: 'Unfiled', neurons: unfiled });
+
+    return { groups, query };
 };
