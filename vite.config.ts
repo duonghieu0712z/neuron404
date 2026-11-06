@@ -11,6 +11,10 @@ export default defineConfig(({ mode }) => {
         process.env.NEURON404_DATA_DIR = env.NEURON404_DATA_DIR;
 
     return {
+        build: {
+            minify: true,
+            sourcemap: false,
+        },
         plugins: [
             tailwindcss(),
             sveltekit({
