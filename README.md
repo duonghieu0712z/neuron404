@@ -38,7 +38,7 @@ Open `http://localhost:3000/neurons`. Both the image and container are named `ne
 | `~/.neuron404/content/`     | `/data/content/`     | Neurons, sources, history, regions, and operation receipts |
 | `~/.neuron404/neuron404.db` | `/data/neuron404.db` | Derived SQLite index and migration state                   |
 
-The image excludes personal content, local databases, and `.env` files. Startup applies committed migrations and synchronizes the index before accepting requests. A new volume starts empty. Rebuilding the image or running `docker compose down` preserves the host directory. Back up the entire directory with the container stopped to capture consistent files.
+The image contains the web build, compiled initialization and CLI tools in `dist/`, production dependencies, and migrations. It excludes application source, TypeScript tooling, application source maps, personal content, local databases, and `.env` files. Startup applies committed migrations and synchronizes the index before accepting requests. A new volume starts empty. Rebuilding the image or running `docker compose down` preserves the host directory. Back up the entire directory with the container stopped to capture consistent files.
 
 `GET /healthz` returns `200` with `{"status":"ok"}` when SQLite responds and the content directory is readable and writable; otherwise it returns `503` with `{"status":"error"}`. Responses are not cached. Compose uses this endpoint for its healthcheck.
 
@@ -57,8 +57,8 @@ docker compose up -d --build
 This retains the repository's original files. SQLite is rebuilt from the copied Markdown, so copying `local.db` is unnecessary. If the destination already contains content, the copy command deliberately does nothing; do not merge independent stores by overwriting files. The repository CLI automatically uses the same store. You can also invoke the container CLI:
 
 ```sh
-docker compose exec -T neuron404 node --import tsx scripts/neuron.ts catalog
-docker compose exec -T neuron404 node --import tsx scripts/neuron.ts search "runtime defaults"
+docker compose exec -T neuron404 node dist/neuron.js catalog
+docker compose exec -T neuron404 node dist/neuron.js search "runtime defaults"
 docker compose logs -f neuron404
 docker compose down
 ```
