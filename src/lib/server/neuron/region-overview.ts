@@ -4,16 +4,16 @@ import path from 'node:path';
 import matter from '@11ty/gray-matter';
 import { z } from 'zod';
 
-import { topicIdSchema } from '#lib/neuron/schema';
+import { regionIdSchema } from '#lib/neuron/schema';
 
+import { readRegions } from './regions';
 import { atomicWrite, CONTENT_DIR, fingerprint, withStorageLock } from './storage';
 import { listNeuronFiles, readNeuronSnapshot } from './store';
-import { readTopics } from './topics';
 
 const revisionSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const membersSchema = z.record(z.string(), revisionSchema);
 const metadataSchema = z.object({
-    region: topicIdSchema,
+    region: regionIdSchema,
     updated: z.string(),
     members: membersSchema,
 });
@@ -24,7 +24,7 @@ const inputSchema = z.object({
 });
 
 function overviewPath(id: string) {
-    return path.join(CONTENT_DIR, 'regions', `${topicIdSchema.parse(id)}.md`);
+    return path.join(CONTENT_DIR, 'regions', `${regionIdSchema.parse(id)}.md`);
 }
 
 function sameMembers(a: Record<string, string>, b: Record<string, string>) {
@@ -44,13 +44,13 @@ async function readRaw(id: string) {
 }
 
 export async function readRegionOverview(id: string) {
-    topicIdSchema.parse(id);
-    const region = (await readTopics()).find((item) => item.id === id);
+    regionIdSchema.parse(id);
+    const region = (await readRegions()).find((item) => item.id === id);
     if (!region) throw new Error(`Unknown region: ${id}`);
     const snapshots = await Promise.all(
         (await listNeuronFiles()).map((name) => readNeuronSnapshot(name.slice(0, -3))),
     );
-    const members = snapshots.filter(({ neuron }) => neuron.topics.includes(id));
+    const members = snapshots.filter(({ neuron }) => neuron.regions.includes(id));
     const memberRevisions = Object.fromEntries(
         members.map(({ neuron, revision }) => [neuron.id, revision]),
     );

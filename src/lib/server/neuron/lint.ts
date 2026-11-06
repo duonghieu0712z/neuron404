@@ -7,9 +7,9 @@ import matter from '@11ty/gray-matter';
 
 import { neuronFrontmatterSchema } from '#lib/neuron/schema';
 
+import { readRegions } from './regions';
 import { readSource } from './sources';
 import { listNeuronFiles, NEURONS_DIR } from './store';
-import { readTopics } from './topics';
 
 export type LintIssueKind =
     | 'dangling-synapse'
@@ -29,11 +29,11 @@ export interface LintIssue {
 export async function lintNeurons(): Promise<LintIssue[]> {
     const fileNames = await listNeuronFiles();
     const issues: LintIssue[] = [];
-    let topicIds: Set<string>;
+    let regionIds: Set<string>;
     try {
-        topicIds = new Set((await readTopics()).map((topic) => topic.id));
+        regionIds = new Set((await readRegions()).map((region) => region.id));
     } catch (error) {
-        return [{ fileName: 'topics.json', kind: 'invalid-regions', message: String(error) }];
+        return [{ fileName: 'regions.json', kind: 'invalid-regions', message: String(error) }];
     }
     const validNeurons = new Map<string, NeuronFrontmatter>();
 
@@ -62,8 +62,8 @@ export async function lintNeurons(): Promise<LintIssue[]> {
             continue;
         }
         validNeurons.set(result.data.id, result.data);
-        for (const id of result.data.topics) {
-            if (!topicIds.has(id))
+        for (const id of result.data.regions) {
+            if (!regionIds.has(id))
                 issues.push({
                     fileName,
                     kind: 'unknown-region',

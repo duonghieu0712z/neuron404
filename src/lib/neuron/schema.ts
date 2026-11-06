@@ -6,22 +6,21 @@ export const ENDORSEMENT_LEVELS = ['unreviewed', 'self-endorsed', 'reviewed', 'd
 export const PROVENANCE_SOURCES = ['original', 'derived', 'external'] as const;
 export const SYNAPSE_KINDS = ['supports', 'contradicts', 'extends', 'cites', 'questions'] as const;
 
-export const topicIdSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
-export const topicSchema = z.object({
-    id: topicIdSchema,
+export const regionIdSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+export const regionSchema = z.object({
+    id: regionIdSchema,
     title: z.string().min(1),
     description: z.string().default(''),
 });
-export const topicCatalogSchema = z.object({
-    topics: z
-        .array(topicSchema)
+export const regionCatalogSchema = z.object({
+    regions: z
+        .array(regionSchema)
         .refine(
-            (topics) => new Set(topics.map((topic) => topic.id)).size === topics.length,
+            (regions) => new Set(regions.map((region) => region.id)).size === regions.length,
             'Region IDs must be unique',
         ),
 });
-export type Region = z.infer<typeof topicSchema>;
-export type Topic = Region;
+export type Region = z.infer<typeof regionSchema>;
 
 export const synapseSchema = z.object({
     target: z.string().min(1),
@@ -39,14 +38,17 @@ export const neuronFrontmatterSchema = z
         grounding: z.enum(GROUNDING_LEVELS),
         endorsement: z.enum(ENDORSEMENT_LEVELS),
         provenance: z.enum(PROVENANCE_SOURCES),
-        topics: z.array(topicIdSchema).default([]),
+        regions: z.array(regionIdSchema).default([]),
         synapses: z.array(synapseSchema).default([]),
         aliases: z.array(z.string().min(1)).default([]),
         sources: z.array(z.string().regex(/^[a-f0-9]{64}$/)).default([]),
         lifecycle: z.enum(['active', 'superseded', 'retracted']).default('active'),
         supersededBy: z.string().min(1).optional(),
     })
-    .passthrough();
+    .passthrough()
+    .refine((data) => !Object.hasOwn(data, 'topics'), {
+        message: 'Legacy Region membership found. Run pnpm neuron migrate.',
+    });
 
 export const newNeuronInputSchema = z.object({
     title: z.string().min(1),
@@ -54,20 +56,20 @@ export const newNeuronInputSchema = z.object({
     grounding: z.enum(GROUNDING_LEVELS),
     endorsement: z.enum(ENDORSEMENT_LEVELS),
     provenance: z.enum(PROVENANCE_SOURCES),
-    topics: z.array(topicIdSchema).default([]),
+    regions: z.array(regionIdSchema).default([]),
     synapses: z.array(synapseSchema).default([]),
     aliases: z.array(z.string().min(1)).default([]),
     sources: z.array(z.string().regex(/^[a-f0-9]{64}$/)).default([]),
 });
 
 export const classifiedNeuronInputSchema = newNeuronInputSchema.extend({
-    topics: z
-        .array(topicIdSchema)
+    regions: z
+        .array(regionIdSchema)
         .min(1, 'Choose an existing Region or create one with region:add.'),
 });
 
 export const updateNeuronInputSchema = newNeuronInputSchema.partial().extend({
-    topics: newNeuronInputSchema.shape.topics.removeDefault().optional(),
+    regions: newNeuronInputSchema.shape.regions.removeDefault().optional(),
     synapses: newNeuronInputSchema.shape.synapses.removeDefault().optional(),
     aliases: newNeuronInputSchema.shape.aliases.removeDefault().optional(),
     sources: newNeuronInputSchema.shape.sources.removeDefault().optional(),

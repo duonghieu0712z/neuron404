@@ -13,7 +13,7 @@ function fold(text: string) {
 }
 
 export interface SearchOptions {
-    topic?: string;
+    region?: string;
     includeHistory?: boolean;
 }
 
@@ -28,17 +28,17 @@ export async function searchNeurons(
     );
     if (!tokens.length) return [];
     const matchQuery = tokens.map((token) => `"${token}"`).join(' OR ');
-    const topicFilter = options.topic
-        ? sql`AND EXISTS (SELECT 1 FROM json_each(n.topics) WHERE value = ${options.topic})`
+    const regionFilter = options.region
+        ? sql`AND EXISTS (SELECT 1 FROM json_each(n.regions) WHERE value = ${options.region})`
         : sql``;
     const lifecycleFilter = options.includeHistory ? sql`` : sql`AND n.lifecycle = 'active'`;
     const result = await db.run(sql`
         SELECT f.id, f.title, f.body, f.aliases,
-            n.revision, n.lifecycle, n.grounding, n.endorsement, n.topics,
+            n.revision, n.lifecycle, n.grounding, n.endorsement, n.regions,
             snippet(neurons_fts, 2, '[', ']', '…', 24) AS snippet,
             bm25(neurons_fts, 0, 8, 1, 5) AS rank
         FROM neurons_fts AS f JOIN neurons AS n ON n.id = f.id
-        WHERE neurons_fts MATCH ${matchQuery} ${topicFilter} ${lifecycleFilter}
+        WHERE neurons_fts MATCH ${matchQuery} ${regionFilter} ${lifecycleFilter}
         ORDER BY rank LIMIT 100
     `);
     const minimum = Math.max(1, Math.ceil(tokens.length * 0.6));
@@ -80,7 +80,7 @@ export async function searchNeurons(
                 lifecycle: String(row.lifecycle),
                 grounding: String(row.grounding),
                 endorsement: String(row.endorsement),
-                topics: JSON.parse(String(row.topics)) as string[],
+                regions: JSON.parse(String(row.regions)) as string[],
                 matchedTerms,
                 queryTermCount: tokens.length,
                 cautions: cautions.rows,

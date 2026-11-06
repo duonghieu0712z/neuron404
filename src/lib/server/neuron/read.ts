@@ -1,9 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { readRegions } from './regions';
 import { CONTENT_DIR, fingerprint, safeId } from './storage';
 import { listNeuronFiles, readNeuronSnapshot } from './store';
-import { readTopics } from './topics';
 
 export async function readNeuronContext(ids: string[]) {
     if (!ids.length || ids.length > 50)
@@ -65,14 +65,14 @@ export async function readNeuronHistory(id: string, revision?: string) {
 }
 
 export async function readCatalog() {
-    const [topics, files] = await Promise.all([readTopics(), listNeuronFiles()]);
+    const [regions, files] = await Promise.all([readRegions(), listNeuronFiles()]);
     const snapshots = await Promise.all(files.map((file) => readNeuronSnapshot(file.slice(0, -3))));
     return {
         neuronCount: snapshots.length,
-        topics: topics.map((topic) => ({
-            ...topic,
-            count: snapshots.filter(({ neuron }) => neuron.topics.includes(topic.id)).length,
+        regions: regions.map((region) => ({
+            ...region,
+            count: snapshots.filter(({ neuron }) => neuron.regions.includes(region.id)).length,
         })),
-        unfiled: snapshots.filter(({ neuron }) => !neuron.topics.length).length,
+        unfiled: snapshots.filter(({ neuron }) => !neuron.regions.length).length,
     };
 }

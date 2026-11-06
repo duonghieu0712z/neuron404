@@ -5,10 +5,10 @@ import { db } from '#lib/server/db';
 import { neurons, synapses } from '#lib/server/db/schema';
 
 import { synchronizeIndexUnlocked } from './indexer';
+import { readRegions } from './regions';
 import { readSource } from './sources';
 import { withStorageLock } from './storage';
 import { readNeuronFile } from './store';
-import { readTopics } from './topics';
 
 export type NeuronDetail = Awaited<ReturnType<typeof getNeuronDetail>>;
 
@@ -32,9 +32,9 @@ export async function getNeuronDetail(id: string) {
 
         const [source, catalog] = await Promise.all([
             readNeuronFile(neuron.filePath),
-            readTopics(),
+            readRegions(),
         ]);
-        const topics = catalog.filter((topic) => source.topics.includes(topic.id));
+        const regions = catalog.filter((region) => source.regions.includes(region.id));
         const sources = (await Promise.all(source.sources.map(readSource))).map(
             ({ id, capturedAt, source: { title, uri, locator } }) => ({
                 id,
@@ -42,6 +42,6 @@ export async function getNeuronDetail(id: string) {
                 source: { title, uri, locator },
             }),
         );
-        return { neuron, outgoing, incoming, topics, sources };
+        return { neuron, outgoing, incoming, regions, sources };
     });
 }

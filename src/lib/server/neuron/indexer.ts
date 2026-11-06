@@ -7,21 +7,22 @@ import { eq, sql } from 'drizzle-orm';
 
 import { neurons, synapses } from '#lib/server/db/schema';
 
+import { readRegions } from './regions';
 import { readSource } from './sources';
 import { CONTENT_DIR, withStorageLock } from './storage';
 import { listNeuronFiles, readNeuronSnapshot } from './store';
-import { readTopics } from './topics';
 
 export async function synchronizeIndexUnlocked(db: Db, force = false) {
     const snapshots = await Promise.all(
         (await listNeuronFiles()).map((file) => readNeuronSnapshot(file.slice(0, -3))),
     );
-    const topicIds = new Set((await readTopics()).map((topic) => topic.id));
+    const regionIds = new Set((await readRegions()).map((region) => region.id));
     const byId = new Map(snapshots.map(({ neuron }) => [neuron.id, neuron]));
     const sourceIds = new Set<string>();
     for (const { neuron } of snapshots) {
-        for (const id of neuron.topics)
-            if (!topicIds.has(id)) throw new Error(`Unknown region "${id}" on neuron ${neuron.id}`);
+        for (const id of neuron.regions)
+            if (!regionIds.has(id))
+                throw new Error(`Unknown region "${id}" on neuron ${neuron.id}`);
         for (const edge of neuron.synapses)
             if (!byId.has(edge.target)) throw new Error(`Unknown synapse target: ${edge.target}`);
         for (const id of neuron.sources) sourceIds.add(id);
@@ -83,7 +84,7 @@ export async function synchronizeIndexUnlocked(db: Db, force = false) {
                 createdAt: neuron.created,
                 updatedAt: neuron.updated,
                 aliases: neuron.aliases,
-                topics: neuron.topics,
+                regions: neuron.regions,
                 sources: neuron.sources,
                 lifecycle: neuron.lifecycle,
                 supersededBy: neuron.supersededBy ?? null,

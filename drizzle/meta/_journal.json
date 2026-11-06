@@ -15,6 +15,13 @@
       "when": 1793865264373,
       "tag": "0001_glossy_wrecker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793947790414,
+      "tag": "0002_young_iron_patriot",
+      "breakpoints": true
     }
   ]
 }

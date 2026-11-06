@@ -14,11 +14,11 @@ export interface NetworkEdgeData {
 }
 
 export function buildNetworkModel(neurons: Neuron[], regions: Region[]) {
-    const nodes: NetworkNodeData[] = neurons.map(({ id, title, grounding, topics }) => ({
+    const nodes: NetworkNodeData[] = neurons.map(({ id, title, grounding, regions }) => ({
         id,
         title,
         grounding,
-        regions: topics,
+        regions,
     }));
     const ids = new Set(nodes.map((node) => node.id));
     const regionIds = new Set(regions.map((region) => region.id));

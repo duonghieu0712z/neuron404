@@ -1,0 +1,1 @@
+ALTER TABLE `neurons` RENAME COLUMN "topics" TO "regions";

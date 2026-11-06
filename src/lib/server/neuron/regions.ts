@@ -3,13 +3,13 @@ import type { Region } from '#lib/neuron/schema';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { topicCatalogSchema, topicSchema } from '#lib/neuron/schema';
+import { regionCatalogSchema, regionSchema } from '#lib/neuron/schema';
 
 import { atomicWrite, CONTENT_DIR, fingerprint, withStorageLock } from './storage';
 
-const catalogPath = path.join(CONTENT_DIR, 'topics.json');
+const catalogPath = path.join(CONTENT_DIR, 'regions.json');
 
-export async function readTopics() {
+export async function readRegions() {
     let content: string;
     try {
         content = await readFile(catalogPath, 'utf-8');
@@ -17,11 +17,11 @@ export async function readTopics() {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
         throw error;
     }
-    return topicCatalogSchema.parse(JSON.parse(content)).topics;
+    return regionCatalogSchema.parse(JSON.parse(content)).regions;
 }
 
 export async function addRegion(input: unknown) {
-    const region = topicSchema.parse(input);
+    const region = regionSchema.parse(input);
     return withStorageLock(async () => {
         let raw: string | undefined;
         try {
@@ -30,9 +30,9 @@ export async function addRegion(input: unknown) {
             if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         }
         const document: Record<string, unknown> =
-            raw === undefined ? { topics: [] } : JSON.parse(raw);
-        const { topics } = topicCatalogSchema.parse(document);
-        const existing = topics.find((item) => item.id === region.id);
+            raw === undefined ? { regions: [] } : JSON.parse(raw);
+        const { regions } = regionCatalogSchema.parse(document);
+        const existing = regions.find((item) => item.id === region.id);
         if (existing) {
             if (existing.title !== region.title || existing.description !== region.description)
                 throw new Error(
@@ -40,7 +40,7 @@ export async function addRegion(input: unknown) {
                 );
             return { ...existing, created: false };
         }
-        const matchingTitle = topics.find(
+        const matchingTitle = regions.find(
             (item) => item.title.trim().toLowerCase() === region.title.trim().toLowerCase(),
         );
         if (matchingTitle)
@@ -53,7 +53,7 @@ export async function addRegion(input: unknown) {
                 raw,
                 true,
             );
-        const next = { ...document, topics: [...(document.topics as Region[]), region] };
+        const next = { ...document, regions: [...(document.regions as Region[]), region] };
         await atomicWrite(catalogPath, `${JSON.stringify(next, null, 4)}\n`);
         return { ...region, created: true };
     });

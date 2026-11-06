@@ -2,16 +2,19 @@ import './env';
 
 import process from 'node:process';
 
+import { migrate } from 'drizzle-orm/libsql/migrator';
+
 import { classifiedNeuronInputSchema, updateNeuronInputSchema } from '#lib/neuron/schema';
 import { createDb } from '#lib/server/db/client';
 import { createNeuron, updateNeuron } from '#lib/server/neuron/create';
 import { rebuildIndex, synchronizeIndex } from '#lib/server/neuron/indexer';
 import { lintNeurons } from '#lib/server/neuron/lint';
+import { migrateRegionStorage } from '#lib/server/neuron/migrate-regions';
 import { readCatalog, readNeuronContext, readNeuronHistory } from '#lib/server/neuron/read';
 import { readRegionOverview, writeRegionOverview } from '#lib/server/neuron/region-overview';
+import { addRegion } from '#lib/server/neuron/regions';
 import { searchNeurons } from '#lib/server/neuron/search';
 import { readSource, saveSource } from '#lib/server/neuron/sources';
-import { addRegion } from '#lib/server/neuron/topics';
 
 async function readPayload() {
     const chunks: Buffer[] = [];
@@ -50,9 +53,16 @@ try {
     else if (command === 'lint') {
         result = await lintNeurons();
         if ((result as unknown[]).length) process.exitCode = 1;
-    } else if (['add', 'update', 'search', 'index'].includes(command)) {
+    } else if (['add', 'update', 'search', 'index', 'migrate'].includes(command)) {
         const db = createDb();
-        if (command === 'add' || command === 'update') {
+        if (command === 'migrate') {
+            try {
+                await migrate(db, { migrationsFolder: './drizzle' });
+                result = { ...(await migrateRegionStorage()), ...(await synchronizeIndex(db)) };
+            } finally {
+                db.$client.close();
+            }
+        } else if (command === 'add' || command === 'update') {
             const saved =
                 command === 'add'
                     ? await createNeuron(db, classifiedNeuronInputSchema.parse(await readPayload()))
@@ -66,7 +76,7 @@ try {
                 title: saved.title,
                 revision: saved.revision,
                 lifecycle: saved.lifecycle,
-                topics: saved.topics,
+                regions: saved.regions,
             };
         } else if (command === 'index')
             result = args.includes('--rebuild')
@@ -78,13 +88,13 @@ try {
                 throw new Error('Limit must be an integer from 1 to 50');
             await synchronizeIndex(db);
             result = await searchNeurons(db, args[0] ?? '', limit, {
-                topic: option('--region') ?? option('--topic'),
+                region: option('--region'),
                 includeHistory: args.includes('--include-history'),
             });
         }
     } else {
         throw new Error(
-            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--include-history]|read ID...|history ID [REVISION]|catalog|region:add|region:read ID|region:write ID|source:add|source:read ID|index [--rebuild]|lint>',
+            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--include-history]|read ID...|history ID [REVISION]|catalog|region:add|region:read ID|region:write ID|source:add|source:read ID|index [--rebuild]|migrate|lint>',
         );
     }
     console.log(JSON.stringify(result, null, 2));

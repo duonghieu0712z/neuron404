@@ -36,9 +36,9 @@
                 <Badge variant="outline">endorsement: {data.neuron.endorsement}</Badge>
                 <Badge variant="outline">provenance: {data.neuron.provenance}</Badge>
             </div>
-            {#if data.topics.length > 0}
+            {#if data.regions.length > 0}
                 <div class="flex flex-wrap gap-1.5 pt-2" aria-label="Regions">
-                    {#each data.topics as region (region.id)}
+                    {#each data.regions as region (region.id)}
                         <Badge variant="secondary">{region.title}</Badge>
                     {/each}
                 </div>
