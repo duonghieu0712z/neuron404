@@ -2,7 +2,9 @@
 !package.json
 !pnpm-lock.yaml
 !tsconfig.json
+!tsconfig.runtime.json
 !vite.config.ts
+!vite.runtime.config.ts
 !src/
 !src/**
 !static/

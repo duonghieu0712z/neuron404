@@ -12,6 +12,7 @@
         "src",
         "scripts",
         "vite.config.ts",
+        "vite.runtime.config.ts",
         "prettier.config.ts",
         "eslint.config.ts",
         "drizzle.config.ts",

@@ -22,13 +22,12 @@ ENV NODE_ENV=production \
     NEURON404_DATA_DIR=/data
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
+COPY --from=build /app/dist ./dist
 COPY package.json ./
-COPY src/lib ./src/lib
-COPY scripts ./scripts
-COPY bin ./bin
+COPY scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY drizzle ./drizzle
 RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 3000
-ENTRYPOINT ["sh", "scripts/docker-entrypoint.sh"]
+ENTRYPOINT ["sh", "docker-entrypoint.sh"]
 CMD ["node", "build/index.js"]

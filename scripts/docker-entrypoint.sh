@@ -1,5 +1,5 @@
 #!/bin/sh
 set -eu
 
-node --import tsx scripts/docker-init.ts
+node dist/docker-init.js
 exec "$@"
