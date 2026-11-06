@@ -1,234 +1,86 @@
 # neuron404
 
-A personal knowledge store based on the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). AI agents save and maintain knowledge as **neurons**, connect justified semantic relationships with **synapses**, and retrieve evidence in later conversations. The web application browses that same store.
+A personal knowledge store for AI-assisted learning and retrieval across projects and conversations. Instead of leaving useful knowledge scattered through chat history, neuron404 keeps it in a shared, local store that AI agents can read, update, and cite later.
 
-## Development
+The foundation is the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): preserve source material, synthesize durable knowledge, and maintain it as understanding changes. Markdown holds the knowledge; SQLite provides the search index. The web application and agent tools use the same data.
 
-Use Node.js >=24 and the pnpm version in `package.json`.
+## What it does
+
+- **Save knowledge with context.** Retain explanations, decisions, and useful lessons alongside source snapshots and revision history.
+- **Find it again.** Search by text or word prefix, browse Regions, and read related cautions and replacements before reusing a claim.
+- **Explore connections.** Browse articles in Neurons or use the interactive Network to inspect relationships, drag neurons, and open Region overviews.
+- **Maintain it with AI.** An optional worker checks knowledge against saved evidence, proposes corrections, and refreshes Region overviews. It requires an explicitly selected Claude or Codex CLI.
+
+A **Neuron** is a coherent knowledge unit. A **Synapse** is a meaningful relationship between neurons. A **Region** groups related knowledge and has its own overview. Sharing a Region does not require a Synapse, and independent neurons are valid.
+
+## Getting started
+
+### Docker
+
+With Docker and Compose v2 installed, run from the repository root:
+
+```sh
+mkdir -p "$HOME/.neuron404"
+docker compose up -d --build
+```
+
+Open [localhost:3000/neurons](http://localhost:3000/neurons). Both the image and container are named `neuron404`. Startup applies migrations and synchronizes the index; a new data directory starts empty.
+
+Set `NEURON404_PORT` to change the host port. If your UID/GID differs from 1000, set `NEURON404_UID` and `NEURON404_GID` in `.env` before starting Compose; see [.env.example](.env.example). Health checks use `/healthz`.
+
+### Local development
+
+Requires Node.js >=24 and the pnpm version specified in `package.json`.
 
 ```sh
 pnpm install
-mkdir -p "$HOME/.neuron404/content/neurons"
-cp .env.example .env
-```
-
-Data paths are detected automatically. Local development and Docker share `~/.neuron404/content/` and `~/.neuron404/neuron404.db`. Set `NEURON404_UID` and `NEURON404_GID` to the output of `id -u` and `id -g` when they differ from 1000, so container writes remain accessible to your local user. Then initialize the database and start development:
-
-```sh
 pnpm db:migrate
 pnpm db:index
 pnpm dev
 ```
 
-`pnpm check`, `pnpm lint`, `pnpm format`, and `pnpm build` verify the application. `pnpm neuron:lint` checks stored structure and source integrity. There is no test runner configured.
+Open the URL printed by Vite. Local development and Docker share `~/.neuron404`; no data-path configuration is needed.
 
-## Docker
+## Using it with AI
 
-Install Docker with Compose v2, then run these commands from the repository:
+The [neuron404 skill](skills/neuron404/SKILL.md) guides an agent through searching, saving, and reviewing knowledge via the CLI. Once configured in the client, use `/neuron404` in Claude or `$neuron404` in Codex, followed by a natural-language request such as “What did we decide about deployment?” or “Save this decision with its rationale.”
 
-```sh
-mkdir -p "$HOME/.neuron404"
-docker compose up -d --build
-```
+Calling the skill without a request reviews the current conversation and proposes knowledge worth keeping; it does not save automatically. Access across conversations requires a local client with tool access to the shared store.
 
-Open `http://localhost:3000/neurons`. Both the image and container are named `neuron404`. The image builds a standalone production server with [SvelteKit's Node adapter](https://svelte.dev/docs/kit/adapter-node). Compose binds the port to the local machine and mounts `~/.neuron404` at `/data`:
-
-| Host path                   | Container path       | Purpose                                                    |
-| --------------------------- | -------------------- | ---------------------------------------------------------- |
-| `~/.neuron404/content/`     | `/data/content/`     | Neurons, sources, history, regions, and operation receipts |
-| `~/.neuron404/neuron404.db` | `/data/neuron404.db` | Derived SQLite index and migration state                   |
-
-The image contains the web build, compiled initialization and CLI tools in `dist/`, production dependencies, and migrations. It excludes application source, TypeScript tooling, application source maps, personal content, local databases, and `.env` files. Startup applies committed migrations and synchronizes the index before accepting requests. A new volume starts empty. Rebuilding the image or running `docker compose down` preserves the host directory. Back up the entire directory with the container stopped to capture consistent files.
-
-`GET /healthz` returns `200` with `{"status":"ok"}` when SQLite responds and the content directory is readable and writable; otherwise it returns `503` with `{"status":"error"}`. Responses are not cached. Compose uses this endpoint for its healthcheck.
-
-To change the host port, run `NEURON404_PORT=8765 docker compose up -d`. On Linux, if your user is not UID/GID 1000, pass `NEURON404_UID=$(id -u) NEURON404_GID=$(id -g)` before Compose commands that start containers so the process can write to your directory. Keep these overrides consistent when recreating containers.
-
-### Import existing local knowledge
-
-When upgrading from repository-local `content/`, stop other writers and copy that directory into an empty destination before the first Docker startup:
+The CLI is also available directly:
 
 ```sh
-mkdir -p "$HOME/.neuron404"
-test ! -e "$HOME/.neuron404/content" && cp -Rp content "$HOME/.neuron404/content"
-docker compose up -d --build
+pnpm neuron search "runtime defaults"
+pnpm neuron catalog --region REGION_ID
+pnpm neuron read NEURON_ID
 ```
 
-This retains the repository's original files. SQLite is rebuilt from the copied Markdown, so copying `local.db` is unnecessary. If the destination already contains content, the copy command deliberately does nothing; do not merge independent stores by overwriting files. The repository CLI automatically uses the same store. You can also invoke the container CLI:
-
-```sh
-docker compose exec -T neuron404 node dist/neuron.js catalog
-docker compose exec -T neuron404 node dist/neuron.js search "runtime defaults"
-docker compose logs -f neuron404
-docker compose down
-```
-
-For `add`, `update`, and `source:add`, pipe JSON into the same `exec -T` command. Rebuild after updating the code with `docker compose up -d --build`.
-
-## Background Region maintenance
-
-Maintenance is **disabled by default**. With no `NEURON404_MAINTENANCE_PROVIDER` (or with `none`),
-`pnpm maintenance` exits without claiming jobs, writing state, or calling a model. It never selects
-Claude or Codex automatically, including when both CLIs are installed.
-
-To enable it, explicitly choose `claude` or `codex` and use that CLI's existing login. The host worker
-audits source fidelity, checks related knowledge, and maintains Region overviews. Docker shares the
-same `~/.neuron404` store; its image does not install agent CLIs or copy login credentials.
+Background maintenance is disabled by default. To enable it, select an installed, authenticated CLI explicitly:
 
 ```sh
 NEURON404_MAINTENANCE_PROVIDER=claude pnpm maintenance
-NEURON404_MAINTENANCE_PROVIDER=codex pnpm maintenance
-pnpm maintenance --status
-pnpm maintenance --once
-pnpm maintenance --overview --once
-pnpm maintenance --audit --once
-pnpm maintenance --reports
-pnpm maintenance --report REPORT_ID
-pnpm maintenance --retry-failed --once
 ```
 
-Alternatively, select the provider in `.env`; the remaining commands use that explicit selection.
-`--status` and report-reading commands work while maintenance is disabled. An invalid or unavailable
-provider fails without falling back to another agent. No model is hard-coded: the optional
-`NEURON404_MAINTENANCE_MODEL` overrides the selected CLI's own model default.
+Use `codex` to select Codex instead. The worker checks supplied evidence, not independent real-world truth, and does not rewrite neuron bodies or Synapses. See the [maintenance guide](docs/maintenance.md) for reports and limits.
 
-A pass processes at most one job. The default daemon polls every 30 seconds and waits for 60 seconds
-of stable revisions; `--once` bypasses that settling delay. It does not install an OS service.
-Overviews are generated and checked in separate ephemeral agent sessions. Every paragraph must
-have a check backed by an exact member quote; unknown citations and invented quotations are rejected.
-Only a passing candidate is published through the existing revision/history service. A rejected
-candidate leaves the current article unchanged. Existing fresh overviews without a matching review
-are checked without rewriting them.
+## Data and development
 
-Knowledge audits compare every Region member with its own supplied source snapshots. They also
-read direct semantic neighbors/replacements and up to three title/alias candidates outside the
-Region to look for contradictions, obsolete claims, duplicates, substantive missing synapses, and
-missing concepts. This is not an exhaustive all-pairs comparison. Changed member and neighbor
-revisions trigger another audit; unchanged inputs are audited again in seven-day periods by default.
-Missing evidence means unverifiable, not false. Sources are not fetched again, so fidelity checks
-cannot establish independent real-world truth or discover every external change.
+Knowledge, source snapshots, history, and Region overviews live under `~/.neuron404/content/`. The derived index is `~/.neuron404/neuron404.db`. Back up the entire directory: rebuilding SQLite cannot recover lost Markdown or source snapshots, and application Git history does not include personal data.
 
-Reports are immutable and content-hashed under `~/.neuron404/maintenance/reports/`. They retain input
-revisions, reviewed scope, evidence checks, exact quotes, and proposals. Open findings carry into
-later knowledge reports with their origin report. Reports appear in Region and neuron sidebars and
-are returned by `pnpm neuron read`; stale reports are labeled when supporting inputs change.
-`pnpm neuron review:reports` and `review:read ID` also expose them to agents. Review events, overview
-publication, failures, and finding decisions are recorded in `maintenance/events.jsonl`.
-
-Neuron bodies, synapses, source snapshots, and lifecycle states are never modified by the worker.
-Apply an authorized correction through the normal knowledge workflow, then explicitly record its
-finding decision; neither command below edits knowledge or marks it human-verified:
+The application uses SvelteKit, Svelte, TypeScript, Tailwind CSS, shadcn-svelte, and SQLite. Before submitting changes, run:
 
 ```sh
-pnpm maintenance --report REPORT_ID --resolve FINDING_ID --note "Corrected the claim and checked its evidence."
-pnpm maintenance --report REPORT_ID --dismiss FINDING_ID --note "Reviewed the finding; its interpretation does not apply."
+pnpm check
+pnpm lint
+pnpm format
+pnpm build
 ```
 
-When enabled, defaults are 4 reserved CLI requests per hour, a 120-second timeout per call, and 3 attempts
-per unchanged job with backoff. An overview refresh reserves two requests for generation and review;
-an audit or a check of an existing overview reserves one. Failed or interrupted jobs conservatively
-consume their reservation. The shared state and leases in `maintenance/state.json` prevent duplicate
-claims and recover expired jobs; limits persist across restarts. Claude invocations also receive a `$0.50` estimated API-cost cap. Codex has no equivalent CLI dollar
-cap; its adapter uses the shared request, input-size, timeout and retry limits. The Claude estimate
-is not a subscription invoice or a guaranteed billing limit. See
-[Claude CLI](https://code.claude.com/docs/en/headless) and
-[Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode).
+Run `pnpm neuron:lint` when changing stored knowledge. The retrieval design is still evolving; long-term effectiveness as the store grows remains to be evaluated.
 
-Configure the commented `NEURON404_MAINTENANCE_*` variables in `.env.example`.
-`NEURON404_MAINTENANCE_CLI` optionally overrides the selected agent's executable; it is not a shell
-command. Claude runs with tools, MCP, hooks, skills and persistence disabled. Codex uses an ephemeral
-read-only run without user config/rules, with command execution, web search, apps, plugins, hooks,
-and subagents disabled. Its existing authentication is retained. Both run in a temporary directory
-and return schema-validated output; only neuron404 writes knowledge. Oversized evidence is blocked
-rather than truncated. Fix issues and inspect the report before `--retry-failed`. Ordinary queries
-never start maintenance or call a review model.
+## Further documentation
 
-Agent integrations implement `MaintenanceAgentAdapter` in
-`src/lib/server/maintenance/agents/types.ts` and register in `agents/index.ts`. An adapter prepares
-an executable, argument array, stdin, and output reader; it does not own scheduling or store writes.
-The shared runner enforces timeout, cancellation, output size and Zod validation. Evidence passage
-references resolve to exact original quotations, and reviewed neuron IDs are constrained by schema.
-Adding an adapter does not enable it or select it by default.
-
-## Terminology
-
-**Neuron** is a knowledge unit, **Synapse** is a semantic relationship, **Region** groups neurons by knowledge context, and **Network** is the exploration view. Region membership does not require synapses. These names are neuroscience-inspired product metaphors, not a biological simulation. Use neuroscience terminology consistently for new product concepts. Region membership uses `regions` throughout the schema, frontmatter, catalog, and CLI; search uses `--region`.
-
-## Storage
-
-- `content/neurons/<id>.md`: current neuron bodies and frontmatter; authoritative knowledge.
-- `content/sources/<sha256>.json`: immutable evidence snapshots with source URI, optional locator, and capture time.
-- `content/history/<id>/<revision>.md`: exact original and subsequent versions saved by updates.
-- `content/operations.jsonl`: append-only write receipts with current and previous revisions.
-- `content/regions.json`: Region definitions; membership is neuron metadata.
-- `content/regions/<id>.md`: authored Region overviews with supporting neuron revisions and links.
-- `content/history/region-overviews/<id>/<revision>.md`: preserved Region article revisions.
-- `content/history/regions/<revision>.json`: exact catalog snapshots before adding Regions.
-- `content/history/storage-migrations/regions.json`: migration receipt with exact files before and after the terminology change.
-- SQLite: derived neuron, relation, and full-text indexes. Rebuild from Markdown with `pnpm neuron index --rebuild`.
-
-Personal content and databases are ignored by Git. Application Git history is not a backup of personal knowledge. Keep private backups of the content directory; rebuilding SQLite cannot recreate lost source files or neuron revisions.
-
-Local web and CLI commands derive the data directory from the operating system home directory: `~/.neuron404`. SQLite is always `neuron404.db` and knowledge files are under `content/` in that directory. No path configuration is required. Docker sets `NEURON404_DATA_DIR=/data` internally to use its bind mount; this optional root override also supports other deployment locations.
-
-Existing Markdown remains valid without aliases, structured sources, or lifecycle fields. Its default lifecycle is `active`, which does not imply verified or current knowledge. The storage refactor does not rewrite legacy bodies, invent source snapshots, or infer replacements.
-
-Network renders actual neurons and typed synapses. Regions define labeled background areas and layout forces that keep members near one another, including isolated neurons. A neuron can belong to multiple regions. Each Region has a draggable, point-top hexagon at the center of its member layout. It opens the authored overview in the sidebar, influences its members when dragged, and always shows its full label, including when ordinary neuron labels are hidden. These are visual metadata markers, excluded from neuron and synapse counts; no membership edges or synthetic knowledge are stored. Grouping does not create semantic relationships. Hovering or selecting a neuron shows traveling pulses along its actual synapses in their stored source-to-target direction. Small pulses render above the lines in matching colors; focused dashed membership lines use the same effect. Pulses stop when motion is paused or the tab is hidden, and respect reduced-motion preferences. A separate dashed overlay can show Region membership: Hidden, Automatic (hover/selection), or Show all. An icon button cycles through the three modes; its tooltip names the current and next mode. The default is Automatic and the choice is saved in the browser. These lines have no arrows, render behind synapses, and do not affect counts, neighbor relationships, or layout forces.
-
-## Agent commands
-
-Use `pnpm neuron <command>` inside this repository. From another directory, invoke this repository's `bin/neuron404` using its absolute path. It resolves the repository itself, loads its `.env`, and uses the same content and database. It does not install global configuration.
-
-```sh
-pnpm neuron catalog --query "project" --limit 20
-pnpm neuron catalog --region project-id --limit 20 --offset 0
-pnpm neuron region:add < region.json
-pnpm neuron region:read region-id --summary
-pnpm neuron region:read region-id
-pnpm neuron region:write region-id < overview.json
-pnpm neuron search "runtime defaults" --region project-id --limit 5
-pnpm neuron read neuron-id another-neuron-id
-pnpm neuron neighbors neuron-id --kind extends --limit 10
-pnpm neuron source:read source-id
-pnpm neuron history neuron-id
-pnpm neuron history neuron-id revision-hash
-pnpm neuron index
-pnpm neuron index --rebuild
-pnpm neuron lint
-```
-
-`source:add`, `add`, and `update <id>` accept JSON on stdin. `source:add` requires `title`, `uri`, and `content`, with optional `locator`. It returns a snapshot ID; a neuron's `sources` array references those IDs. Repeated captures of identical source payloads reuse the same snapshot.
-
-A Region hexagon opens a full authored overview in the detail sidebar. After an ingestion batch, the agent reads the Region members and maintains this article with citations. `region:read ID` returns the article revision and member revisions; `region:write ID` accepts `{body, expectedRevision, memberRevisions}`. Use `null` as the expected revision for a new article. Changes to supporting neurons mark the article as needing a refresh; conflicting writes are rejected and previous article bytes are preserved.
-
-The agent classifies knowledge during ingestion, reusing a suitable Region from `catalog` or creating one with `region:add`. This command accepts `{id, title, description}` on stdin, locks the catalog, preserves its previous bytes, and refuses to overwrite a conflicting definition. Repeating an identical definition reuses it. Classification uses the AI running the skill; the CLI does not call a separate model. A new subject should not silently become Unfiled because its Region is absent.
-
-When upgrading an existing store, run `pnpm neuron migrate` once before using the application. It applies database migrations, renames the old membership key and catalog to `regions`, refreshes overview member revisions, and synchronizes SQLite. Exact previous files are preserved in history; interrupted migrations can be rerun. Docker initialization performs the same migration automatically.
-
-Agent `add` commands require `title`, `body`, `grounding`, `endorsement`, `provenance`, and a nonempty `regions` array of Region IDs. Optional arrays are `aliases`, `sources`, `synapses`, and `retrievalCues` (up to eight reading situations of 240 characters each). Retrieval cues guide article selection; they are not extra knowledge claims. Existing Markdown remains unchanged when this field is absent. Each synapse has `target`, `kind`, and optional `note`; supported kinds are `supports`, `contradicts`, `extends`, `cites`, and `questions`. Legacy unfiled neurons remain readable, and the manual web form remains compatible; automatic classification belongs to the agent ingestion workflow.
-
-`read` returns the neuron, its content-hash `revision`, incoming links, and relevant contradiction/question/replacement bodies. `update` accepts changed fields plus the exact `expectedRevision` from a fresh read. Write receipts include `regions` so the agent can confirm Region assignment. Concurrent or stale updates fail instead of overwriting newer knowledge. Prior versions retain their exact bytes. Update the same neuron when knowledge develops; create a new neuron for a distinct concept.
-
-Lifecycle is separate from semantic relationships: `active`, `superseded` with `supersededBy`, or `retracted`. Use `--include-history` to include inactive neurons in search. A `contradicts` synapse does not automatically mark either neuron superseded.
-
-Retrieval has two metadata levels: paginated Region definitions (`catalog`, optionally `--query`) and paginated neuron entries (`catalog --region ID`). Entries contain titles, aliases and reading situations, not bodies. Follow `nextOffset` as needed; root catalog queries match Region definitions only. `region:read ID --summary` returns the overview and freshness without membership maps or review reports. Full `region:read` remains available for editing with optimistic concurrency.
-
-Search uses weighted BM25 over titles, aliases, retrieval cues, and bodies, with token prefixes, optional Region scope and lexical coverage calculated inside SQLite before pagination. `--limit 1-50` and `--offset N` bound results; queries accept at most 24 distinct non-stopword terms. It returns caution links even if those linked neurons were not separate search hits. This is not embedding search: different wording may require another query. Snippets locate candidates; read the supporting neurons before answering. `read` opens selected Markdown and relevant cautions rather than every neuron; its compact review assessments omit Region-wide revision maps. It limits automatic expansion to 200 incoming links and 50 caution/replacement bodies per selected neuron, with `contextTruncated` when incomplete. Use paginated `neighbors ID` with `--kind` and `--direction incoming|outgoing|both` to inspect further relationships without loading their bodies.
-
-Ordinary retrieval reuses a persisted index checkpoint. CLI writes synchronize immediately. External edits are reconciled on the next query after 30 seconds; directory/catalog changes and the dirty marker trigger an earlier check. Reconciliation walks file metadata and parses only changed files with bounded concurrency. Reading a selected neuron verifies its actual content hash and reconciles a mismatch immediately. Run `pnpm neuron index` for immediate discovery of external edits or `--rebuild` for a complete reparse and evidence validation. No watcher daemon or model call is required. The checkpoint, file stamps and retrieval columns are derived SQLite data; this does not rewrite Markdown or source snapshots.
-
-The index structure and SQLite retrieval approach are provisional. Their effectiveness has not yet been evaluated sufficiently to establish an advantage over a multi-level Markdown index. Functional checks and synthetic timing measurements do not establish long-term retrieval quality; assess real use as the knowledge store grows and improve the design incrementally.
-
-## Recovery and chat access
-
-Writes use a storage lock, immutable revision snapshots, and atomic file replacement. Index synchronization updates changed rows in a transaction and preserves existing synapse IDs when their source, target and kind remain unchanged. If a file was saved but subsequent processing failed, read the neuron identified by the error before retrying, then run `pnpm neuron index`. A leftover `content/.write-lock` after a crash must be checked against its recorded PID before removal; never remove a live writer's lock.
-
-The portable skill source is [skills/neuron404/SKILL.md](skills/neuron404/SKILL.md). It loads only the workflow reference needed for retrieval, maintenance, or verification and delegates to the existing CLI through `skills/neuron404/scripts/neuron404`.
-
-In Claude Code, invoke `/neuron404` alone to review the current conversation and propose knowledge to retain or update without saving it. Add an optional intent such as `search`, `save`, `ingest`, or `review`, or simply write a natural-language request: `/neuron404 what did we decide about deployment?` or `/neuron404 save the decision we just agreed on`. These intents select agent workflows, not new CLI subcommands. Use the client's native skill syntax elsewhere, such as `$neuron404` in Codex. Explicit saves include classification and affected Region overview maintenance; questions and reviews remain read-only.
-
-Claude's global entry at `~/.claude/skills/neuron404` and Codex's global entry at `~/.agents/skills/neuron404` are symlinks to this repository's `skills/neuron404/`. The launcher resolves that link to locate the repository from any working directory; `NEURON404_HOME` can explicitly select another repository. The project-local `.claude/skills/neuron404/` copy has been removed.
-
-The user authorizes improving this skill during actual use. Keep the repository directory as the canonical source: changes made through either global link already update the project and the other client. Resolve links before editing and preserve this setup instead of creating independent copies. If the repository moves, update both links. Do not include personal knowledge or local transcripts in skill changes, modify unrelated client settings, or commit automatically.
-
-Global discovery applies to local clients with access to these paths. It does not provide cloud access, remote hosting, an MCP server, or an additional LLM provider; each client still needs tool access to the same store.
+- [Deployment, migration, and container operations](docs/deployment.md)
+- [Agent workflows, CLI reference, and recovery](docs/agent-workflows.md)
+- [Background maintenance and review reports](docs/maintenance.md)
+- [Architecture, storage, and Network behavior](docs/architecture.md)
