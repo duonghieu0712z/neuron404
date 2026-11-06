@@ -1,6 +1,6 @@
 ---
 name: neuron404
-description: Retrieve personal knowledge from neuron404 with evidence and corrections, save or update authorized durable knowledge, or inspect stored knowledge. Use for requests to remember, recall, revisit earlier project decisions, or verify recorded claims.
+description: Search personal knowledge with evidence, save or update authorized knowledge, or review the current conversation for knowledge worth retaining. Use when neuron404 is invoked, or for requests to remember, revisit earlier decisions, ingest knowledge, or verify recorded claims.
 ---
 
 # neuron404
@@ -17,13 +17,21 @@ Invoke `scripts/neuron404` relative to this skill's actual directory. It follows
 
 The launcher requires local shell access, Node.js, pnpm, and an initialized repository database. A missing capability or inaccessible store is a connection failure, not evidence that no knowledge exists. Do not create another store, install dependencies, or change client permissions merely to answer a recall question.
 
-## Select the workflow
+## Interpret the invocation
 
-Read only the relevant reference:
+The skill is named `neuron404`. In clients that expose skills as slash commands, use `/neuron404`; use the client's native skill invocation otherwise. Commands below are optional skill intents, not additional CLI subcommands. Interpret natural-language requests in the user's language without requiring a keyword.
 
-- Recall, explain, compare, or summarize recorded knowledge: [Retrieve](references/retrieve.md).
-- Save durable knowledge, enrich an existing neuron, or apply an authorized correction: [Maintain](references/maintain.md).
-- Inspect integrity or verify a recorded claim against evidence: [Verify](references/verify.md).
+| Invocation or intent                                                       | Workflow                                                                                                             |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| No arguments                                                               | [Review the current conversation](references/context-review.md); propose useful additions or updates without writing |
+| `search <request>` or a question about stored knowledge                    | [Retrieve](references/retrieve.md); find, read, and answer with evidence                                             |
+| `save <request>` or an explicit request to remember or update knowledge    | [Maintain](references/maintain.md), using the specified conversation context or material                             |
+| `ingest <source or request>` or a request to learn from specified material | [Maintain](references/maintain.md), preserving source evidence and synthesizing durable knowledge                    |
+| `review <subject>` or a request to assess stored knowledge                 | [Verify](references/verify.md); report findings and proposed changes without applying them                           |
+
+Examples: `/neuron404`, `/neuron404 search how does asset remapping work?`, `/neuron404 save the decision we just agreed on`, `/neuron404 what did we decide about deployment?`, `/neuron404 learn from the notes in /path/to/project`.
+
+Read only the references needed for the actual request. Keywords are hints: the full request determines scope, including instructions to only propose or not save. Do not pass skill intents such as `save`, `ingest`, or `review` verbatim to the CLI. Translate them into the documented CLI operations in the chosen reference. If a requested subject or source is omitted, use an unambiguous reference in the visible conversation; ask briefly only when the ambiguity prevents useful work. An explicit question without a keyword remains a retrieval request, not a no-argument review.
 
 A request to read or evaluate does not authorize saving, rewriting, or adding synapses. Respect standing authorization when it exists; do not ask again for actions already covered by it. Development lessons can be knowledge, but raw progress and temporary work logs need not be stored.
 

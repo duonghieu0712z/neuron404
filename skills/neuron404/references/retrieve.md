@@ -10,7 +10,9 @@ Start with `search "<specific terms>" [--region <id>] [--limit <1-50>]`. Prefer 
 
 Search returns candidates and snippets, not a ready-made answer. Use `read <id> [<id> ...]` to read the relevant neurons together, up to 50 at a time. Read their bodies, incoming relationships, and relevant `cautions`, including contradictions, questions, and replacement chains. Keep historical and current viewpoints distinct. A contradiction alone does not decide which side is correct; an old neuron's default `active` lifecycle is compatibility metadata, not a validity judgment.
 
-For an overview, cover the relevant aspects across multiple neurons. Do not describe an entire project as fully understood from one debugging note. Reuse existing synthesis when it fits; inspect further evidence when it does not. Follow links selectively rather than loading every neuron or source.
+For a broad project or Region question, locate the relevant Region with `catalog` and read its overview with `region:read ID` first. Use it to identify the relevant member neurons, then read the supporting details needed for the answer. Check `stale` and distinguish historical claims; an overview is synthesis, not independent evidence. If it is absent or stale, derive the answer from current members without silently refreshing the article. For a narrow question, search directly rather than loading a whole Region.
+
+Cover the relevant aspects across multiple neurons when the question calls for an overview. Do not describe an entire project as fully understood from one debugging note. Follow links selectively rather than loading every neuron or source.
 
 ## Answer from evidence
 
