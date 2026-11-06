@@ -4,7 +4,7 @@ Use the skill launcher described in `SKILL.md`; commands below are its arguments
 
 ## Locate and read
 
-Interpret the subject, project context, time frame, and requested depth. Region scope is optional: search globally when the question crosses contexts or the region is unknown. `catalog` lists region definitions under the legacy JSON key `topics` and their member counts; do not treat this as a second taxonomy.
+Interpret the subject, project context, time frame, and requested depth. Region scope is optional: search globally when the question crosses contexts or the region is unknown. `catalog` lists region definitions under the JSON key `regions` and their member counts.
 
 Start with `search "<specific terms>" [--region <id>] [--limit <1-50>]`. Prefer named subjects, identifiers, or distinctive terminology over a full conversational sentence. Search is lexical, not semantic. If relevant evidence is missing, try alternate wording, abbreviations, aliases, or a broader scope. Use `--include-history` when investigating replaced decisions or retracted knowledge. A no-match result does not establish absence of knowledge.
 

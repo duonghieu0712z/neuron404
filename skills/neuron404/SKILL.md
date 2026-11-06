@@ -5,7 +5,7 @@ description: Search personal knowledge with evidence, save or update authorized 
 
 # neuron404
 
-Use the shared personal knowledge store across projects and conversations. Its foundation is LLM Wiki: preserve evidence, maintain accumulated knowledge, and retrieve it with citations. **Neuron** is a coherent knowledge unit; **Synapse** is a typed semantic relationship; **Region** groups knowledge; **Network** is the exploration view. An isolated neuron is valid. Shared region membership does not imply a synapse.
+Use the shared personal knowledge store across projects and conversations. Its foundation is LLM Wiki: preserve evidence, maintain accumulated knowledge, and retrieve it with citations. **Neuron** is a coherent knowledge unit; **Synapse** is a typed semantic relationship; **Region** groups knowledge; **Network** is the exploration view. Use neuroscience or neurobiology terminology for new product concepts, according to their actual roles. Region membership uses `regions` in CLI payloads and results. An isolated neuron is valid. Shared region membership does not imply a synapse.
 
 ## Connect to the store
 

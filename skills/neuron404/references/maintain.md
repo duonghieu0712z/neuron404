@@ -24,7 +24,7 @@ Region classification is part of an authorized save. Read `catalog`, interpret t
 
 When no existing Region fits, create one with `region:add` using JSON `{id, title, description}`. Choose a stable lowercase kebab-case ID and a description that makes the Region's scope clear to future agents. Reuse an appropriate existing Region; avoid synonyms, one Region per neuron, and catch-all names such as Unfiled or Miscellaneous. Project-specific architecture and deployment knowledge belongs to that project's Region, not another project's principles merely because they share tools. A source is evidence, not an automatic Region: classify each neuron by meaning, and use multiple memberships only when each applies substantively.
 
-Creating a necessary Region is included in the authorized ingestion workflow. The AI running this skill makes the semantic decision; the CLI stores and validates it and does not call a separate model. Register new definitions before saving neurons, pass their IDs in `topics`, and verify membership in the write receipt. Agent `add` commands reject missing or empty membership. When updating an unfiled neuron, classify it as part of the update; preserve valid existing memberships otherwise. If source content is inaccessible or insufficient to identify a subject, report the incomplete ingest instead of claiming an Unfiled save is complete. An isolated neuron may still have a Region without any synapse.
+Creating a necessary Region is included in the authorized ingestion workflow. The AI running this skill makes the semantic decision; the CLI stores and validates it and does not call a separate model. Register new definitions before saving neurons, pass their IDs in `regions`, and verify membership in the write receipt. Agent `add` commands reject missing or empty membership. When updating an unfiled neuron, classify it as part of the update; preserve valid existing memberships otherwise. If source content is inaccessible or insufficient to identify a subject, report the incomplete ingest instead of claiming an Unfiled save is complete. An isolated neuron may still have a Region without any synapse.
 
 ## Maintain Region overviews
 
@@ -52,7 +52,7 @@ Explain a non-obvious relationship in `note`. Shared vocabulary, origin, region,
 
 ## Write and confirm
 
-`add` requires `title`, `body`, `grounding`, `endorsement`, `provenance`, and a nonempty `topics` array of Region IDs. Optional arrays are `aliases`, `sources`, and `synapses`. The legacy key `topics` stores Region membership; use `catalog` and `region:add` to resolve it before writing. A synapse is `{target, kind, note?}`. Add useful aliases grounded in actual terminology, not speculative search keywords.
+`add` requires `title`, `body`, `grounding`, `endorsement`, `provenance`, and a nonempty `regions` array of Region IDs. Optional arrays are `aliases`, `sources`, and `synapses`. The `regions` array stores Region membership; use `catalog` and `region:add` to resolve it before writing. A synapse is `{target, kind, note?}`. Add useful aliases grounded in actual terminology, not speculative search keywords.
 
 Grounding values are `assumption`, `inferred`, `sourced`; endorsement values are `unreviewed`, `self-endorsed`, `reviewed`, `disputed`; provenance values are `original`, `derived`, `external`. Classify each axis from its meaning. AI source checking does not authorize human endorsement. A source-backed premise does not automatically establish a derived conclusion.
 
