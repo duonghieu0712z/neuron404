@@ -16,7 +16,7 @@
 
     const panel = getNeuronPanelContext();
 
-    let searchValue = $state(data.query);
+    let searchValue = $derived(data.query);
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
     function handleSearchInput(event: Event) {
