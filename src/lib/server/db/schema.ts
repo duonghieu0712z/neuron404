@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { int, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, int, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const neurons = sqliteTable('neurons', {
     id: text('id').primaryKey(),
@@ -18,18 +18,36 @@ export const neurons = sqliteTable('neurons', {
     lifecycle: text('lifecycle').notNull().default('active'),
     supersededBy: text('superseded_by'),
     revision: text('revision').notNull().default(''),
+    fileStamp: text('file_stamp').notNull().default(''),
+    retrievalCues: text('retrieval_cues', { mode: 'json' }).$type<string[]>().notNull().default([]),
 });
 
-export const synapses = sqliteTable('synapses', {
-    id: int('id').primaryKey({ autoIncrement: true }),
-    sourceNeuronId: text('source_neuron_id')
-        .notNull()
-        .references(() => neurons.id, { onDelete: 'cascade' }),
-    targetNeuronId: text('target_neuron_id')
-        .notNull()
-        .references(() => neurons.id, { onDelete: 'cascade' }),
-    kind: text('kind').notNull(),
-    note: text('note'),
+export const synapses = sqliteTable(
+    'synapses',
+    {
+        id: int('id').primaryKey({ autoIncrement: true }),
+        sourceNeuronId: text('source_neuron_id')
+            .notNull()
+            .references(() => neurons.id, { onDelete: 'cascade' }),
+        targetNeuronId: text('target_neuron_id')
+            .notNull()
+            .references(() => neurons.id, { onDelete: 'cascade' }),
+        kind: text('kind').notNull(),
+        note: text('note'),
+    },
+    (table) => [
+        index('synapses_source_idx').on(table.sourceNeuronId),
+        index('synapses_target_idx').on(table.targetNeuronId),
+    ],
+);
+
+export const neuronIndexState = sqliteTable('neuron_index_state', {
+    id: text('id').primaryKey(),
+    checkedAt: int('checked_at').notNull(),
+    neuronCount: int('neuron_count').notNull(),
+    synapseCount: int('synapse_count').notNull(),
+    directoryStamp: text('directory_stamp').notNull(),
+    catalogStamp: text('catalog_stamp').notNull(),
 });
 
 export const neuronsRelations = relations(neurons, ({ many }) => ({

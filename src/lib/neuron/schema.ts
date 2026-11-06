@@ -22,6 +22,8 @@ export const regionCatalogSchema = z.object({
 });
 export type Region = z.infer<typeof regionSchema>;
 
+export const retrievalCuesSchema = z.array(z.string().trim().min(1).max(240)).max(8).default([]);
+
 export const synapseSchema = z.object({
     target: z.string().min(1),
     kind: z.enum(SYNAPSE_KINDS),
@@ -41,6 +43,7 @@ export const neuronFrontmatterSchema = z
         regions: z.array(regionIdSchema).default([]),
         synapses: z.array(synapseSchema).default([]),
         aliases: z.array(z.string().min(1)).default([]),
+        retrievalCues: retrievalCuesSchema,
         sources: z.array(z.string().regex(/^[a-f0-9]{64}$/)).default([]),
         lifecycle: z.enum(['active', 'superseded', 'retracted']).default('active'),
         supersededBy: z.string().min(1).optional(),
@@ -59,6 +62,7 @@ export const newNeuronInputSchema = z.object({
     regions: z.array(regionIdSchema).default([]),
     synapses: z.array(synapseSchema).default([]),
     aliases: z.array(z.string().min(1)).default([]),
+    retrievalCues: retrievalCuesSchema,
     sources: z.array(z.string().regex(/^[a-f0-9]{64}$/)).default([]),
 });
 
@@ -73,6 +77,7 @@ export const updateNeuronInputSchema = newNeuronInputSchema.partial().extend({
     synapses: newNeuronInputSchema.shape.synapses.removeDefault().optional(),
     aliases: newNeuronInputSchema.shape.aliases.removeDefault().optional(),
     sources: newNeuronInputSchema.shape.sources.removeDefault().optional(),
+    retrievalCues: retrievalCuesSchema.removeDefault().optional(),
     expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
     status: z.enum(NEURON_STATUSES).optional(),
     lifecycle: z.enum(['active', 'superseded', 'retracted']).optional(),

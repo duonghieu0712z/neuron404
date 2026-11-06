@@ -25,7 +25,7 @@ export async function listNeuronFiles(): Promise<string[]> {
 
 export async function readNeuronSnapshot(id: string) {
     const raw = await readFile(filePathFor(id), 'utf8');
-    const parsed = matter(raw);
+    const parsed = matter(raw, {});
     const frontmatter = neuronFrontmatterSchema.parse(parsed.data);
     if (frontmatter.id !== id) throw new Error(`Neuron ID does not match filename: ${id}`);
     return {
