@@ -45,7 +45,7 @@ Open the URL printed by Vite. Local development and Docker share `~/.neuron404`;
 
 The [neuron404 skill](skills/neuron404/SKILL.md) guides an agent through searching, saving, and reviewing knowledge via the CLI. Once configured in the client, use `/neuron404` in Claude or `$neuron404` in Codex, followed by a natural-language request such as “What did we decide about deployment?” or “Save this decision with its rationale.”
 
-Calling the skill without a request reviews the current conversation and proposes knowledge worth keeping; it does not save automatically. Access across conversations requires a local client with tool access to the shared store.
+Calling the skill without a request reviews the current conversation and proposes knowledge worth keeping; it does not save automatically. Access across conversations requires a client with tool access to the store. The skill can use a local repository or connect to a server over HTTPS; see [remote access](docs/remote-access.md).
 
 The CLI is also available directly:
 
@@ -80,6 +80,7 @@ Run `pnpm neuron:lint` when changing stored knowledge. The retrieval design is s
 
 ## Further documentation
 
+- [Remote access and optional Cloudflare deployment](docs/remote-access.md)
 - [Deployment, migration, and container operations](docs/deployment.md)
 - [Agent workflows, CLI reference, and recovery](docs/agent-workflows.md)
 - [Background maintenance and review reports](docs/maintenance.md)

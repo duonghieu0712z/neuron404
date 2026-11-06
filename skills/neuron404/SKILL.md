@@ -15,7 +15,7 @@ Invoke `scripts/neuron404` relative to this skill's actual directory. It follows
 "/absolute/path/to/skills/neuron404/scripts/neuron404" catalog --limit 20
 ```
 
-The launcher requires local shell access, Node.js, pnpm, and an initialized repository database. A missing capability or inaccessible store is a connection failure, not evidence that no knowledge exists. Do not create another store, install dependencies, or change client permissions merely to answer a recall question.
+Without `NEURON404_URL`, the launcher requires local shell access, Node.js, pnpm, and an initialized repository database. With `NEURON404_URL`, it uses the bundled remote client and `NEURON404_TOKEN`; Node.js >=24 is sufficient and no local repository or store is needed. Read [remote connection](references/remote.md) when remote mode is configured or a remote request fails. On native Windows without `sh`, invoke `node <skill-directory>/scripts/remote.mjs` with the same arguments for remote mode; for local mode run `pnpm --dir <repository> neuron <arguments>`. WSL/Git Bash and Linux use the shell launcher. A missing capability or inaccessible store is a connection failure, not evidence that no knowledge exists. Do not create another store, install dependencies, or change client permissions merely to answer a recall question.
 
 ## Interpret the invocation
 

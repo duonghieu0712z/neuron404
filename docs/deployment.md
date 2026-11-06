@@ -1,5 +1,7 @@
 # Deployment
 
+For a server accessed from other machines, configure [remote access](remote-access.md) before publishing the web application.
+
 Install Docker with Compose v2, then run these commands from the repository:
 
 ```sh

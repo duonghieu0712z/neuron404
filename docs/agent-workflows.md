@@ -2,7 +2,7 @@
 
 ## Agent commands
 
-Use `pnpm neuron <command>` inside this repository. From another directory, invoke this repository's `bin/neuron404` using its absolute path. It resolves the repository itself, loads its `.env`, and uses the same content and database. It does not install global configuration.
+Use `pnpm neuron <command>` inside this repository. From another directory, invoke this repository's `bin/neuron404` using its absolute path. By default it resolves the repository itself, loads its `.env`, and uses the same content and database. With `NEURON404_URL` exported, `bin/neuron404` uses the HTTPS client instead; `pnpm neuron` remains local administration. See [remote access](remote-access.md). It does not install global configuration.
 
 ```sh
 pnpm neuron catalog --query "project" --limit 20
