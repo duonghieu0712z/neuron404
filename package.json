@@ -26,6 +26,7 @@
         "format:fix": "prettier --write .",
         "lint": "eslint . --cache",
         "lint:fix": "eslint --fix . --cache",
+        "maintenance": "node --import tsx scripts/maintenance.ts",
         "neuron": "node --import tsx scripts/neuron.ts",
         "neuron:add": "node --import tsx scripts/add-neuron.ts",
         "neuron:lint": "node --import tsx scripts/lint-neurons.ts",

@@ -1,6 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { readRegionReviews } from '#lib/server/maintenance/reports';
+
 import { readRegions } from './regions';
 import { CONTENT_DIR, fingerprint, safeId } from './storage';
 import { listNeuronFiles, readNeuronSnapshot } from './store';
@@ -12,6 +14,10 @@ export async function readNeuronContext(ids: string[]) {
         (await listNeuronFiles()).map((file) => readNeuronSnapshot(file.slice(0, -3))),
     );
     const byId = new Map(snapshots.map((item) => [item.neuron.id, item]));
+    const regionIds = [...new Set(ids.flatMap((id) => byId.get(id)?.neuron.regions ?? []))];
+    const reviews = (await Promise.all(regionIds.map((id) => readRegionReviews(id, snapshots))))
+        .flat()
+        .filter((report) => report.kind === 'knowledge');
     return ids.map((id) => {
         const current = byId.get(id);
         if (!current) throw new Error(`Neuron not found: ${id}`);
@@ -39,7 +45,23 @@ export async function readNeuronContext(ids: string[]) {
             .map((target) => byId.get(target))
             .filter((item) => item !== undefined)
             .map(({ neuron, revision }) => ({ neuron, revision }));
-        return { neuron: current.neuron, revision: current.revision, incoming, cautions };
+        return {
+            neuron: current.neuron,
+            revision: current.revision,
+            incoming,
+            cautions,
+            reviews: reviews
+                .filter(
+                    (report) =>
+                        report.checks.some((check) => check.subject === id) ||
+                        report.findings.some((finding) => finding.neurons.includes(id)),
+                )
+                .map((report) => ({
+                    ...report,
+                    checks: report.checks.filter((check) => check.subject === id),
+                    findings: report.findings.filter((finding) => finding.neurons.includes(id)),
+                })),
+        };
     });
 }
 

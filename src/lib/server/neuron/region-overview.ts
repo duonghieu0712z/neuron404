@@ -5,6 +5,7 @@ import matter from '@11ty/gray-matter';
 import { z } from 'zod';
 
 import { regionIdSchema } from '#lib/neuron/schema';
+import { readRegionReviews } from '#lib/server/maintenance/reports';
 
 import { readRegions } from './regions';
 import { atomicWrite, CONTENT_DIR, fingerprint, withStorageLock } from './storage';
@@ -43,11 +44,14 @@ async function readRaw(id: string) {
     }
 }
 
-export async function readRegionOverview(id: string) {
+export async function readRegionOverview(
+    id: string,
+    snapshots?: Awaited<ReturnType<typeof readNeuronSnapshot>>[],
+) {
     regionIdSchema.parse(id);
     const region = (await readRegions()).find((item) => item.id === id);
     if (!region) throw new Error(`Unknown region: ${id}`);
-    const snapshots = await Promise.all(
+    snapshots ??= await Promise.all(
         (await listNeuronFiles()).map((name) => readNeuronSnapshot(name.slice(0, -3))),
     );
     const members = snapshots.filter(({ neuron }) => neuron.regions.includes(id));
@@ -66,40 +70,43 @@ export async function readRegionOverview(id: string) {
         memberRevisions,
         stale: metadata !== null && !sameMembers(metadata.members, memberRevisions),
         neurons: members.map(({ neuron }) => ({ id: neuron.id, title: neuron.title })),
+        reviews: await readRegionReviews(id, snapshots),
     };
 }
 
 export type RegionOverview = Awaited<ReturnType<typeof readRegionOverview>>;
 
-export async function writeRegionOverview(id: string, payload: unknown) {
+export async function writeRegionOverviewUnlocked(id: string, payload: unknown) {
     const input = inputSchema.parse(payload);
-    return withStorageLock(async () => {
-        const current = await readRegionOverview(id);
-        if (current.revision !== input.expectedRevision)
-            throw new Error('Region overview revision conflict. Read region:read before retrying.');
-        if (!sameMembers(current.memberRevisions, input.memberRevisions))
-            throw new Error(
-                'Region members changed. Read the affected neurons and refresh the overview.',
-            );
-        const citations = [...input.body.matchAll(/\]\(neuron:([a-zA-Z0-9_-]+)\)/g)];
-        if (current.neurons.length && !citations.length)
-            throw new Error(
-                'A Region overview must cite supporting neurons with Markdown neuron: links.',
-            );
-        for (const match of citations)
-            if (!Object.hasOwn(current.memberRevisions, match[1]))
-                throw new Error(`Overview citation is not a member of this Region: ${match[1]}`);
-        const previous = await readRaw(id);
-        const history = path.join(CONTENT_DIR, 'history', 'region-overviews', id);
-        if (previous !== null)
-            await atomicWrite(path.join(history, `${fingerprint(previous)}.md`), previous, true);
-        const raw = matter.stringify(`${input.body}\n`, {
-            region: id,
-            updated: new Date().toISOString(),
-            members: input.memberRevisions,
-        });
-        await atomicWrite(overviewPath(id), raw);
-        await atomicWrite(path.join(history, `${fingerprint(raw)}.md`), raw, true);
-        return readRegionOverview(id);
+    const current = await readRegionOverview(id);
+    if (current.revision !== input.expectedRevision)
+        throw new Error('Region overview revision conflict. Read region:read before retrying.');
+    if (!sameMembers(current.memberRevisions, input.memberRevisions))
+        throw new Error(
+            'Region members changed. Read the affected neurons and refresh the overview.',
+        );
+    const citations = [...input.body.matchAll(/\]\(neuron:([a-zA-Z0-9_-]+)\)/g)];
+    if (current.neurons.length && !citations.length)
+        throw new Error(
+            'A Region overview must cite supporting neurons with Markdown neuron: links.',
+        );
+    for (const match of citations)
+        if (!Object.hasOwn(current.memberRevisions, match[1]))
+            throw new Error(`Overview citation is not a member of this Region: ${match[1]}`);
+    const previous = await readRaw(id);
+    const history = path.join(CONTENT_DIR, 'history', 'region-overviews', id);
+    if (previous !== null)
+        await atomicWrite(path.join(history, `${fingerprint(previous)}.md`), previous, true);
+    const raw = matter.stringify(`${input.body}\n`, {
+        region: id,
+        updated: new Date().toISOString(),
+        members: input.memberRevisions,
     });
+    await atomicWrite(overviewPath(id), raw);
+    await atomicWrite(path.join(history, `${fingerprint(raw)}.md`), raw, true);
+    return readRegionOverview(id);
+}
+
+export async function writeRegionOverview(id: string, payload: unknown) {
+    return withStorageLock(() => writeRegionOverviewUnlocked(id, payload));
 }
