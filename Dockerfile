@@ -1,9 +1,9 @@
-FROM ghcr.io/pnpm/pnpm:12.16.1 AS base
-RUN pnpm runtime set node 24.20.0 --global
+FROM ghcr.io/pnpm/pnpm:alpine AS base
+RUN pnpm runtime set node lts --global
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
-FROM base AS production-dependencies
+FROM base AS prod-deps
 ENV NODE_ENV=production
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --prod --frozen-lockfile --ignore-scripts --store-dir /pnpm/store
@@ -14,13 +14,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 COPY . .
 RUN NEURON404_DATA_DIR=/tmp/neuron404-build pnpm build
 
-FROM node:24.20.0-trixie-slim AS production
+FROM node:lts-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000 \
     NEURON404_DATA_DIR=/data
-COPY --from=production-dependencies /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 COPY --from=build /app/dist ./dist
 COPY package.json ./
