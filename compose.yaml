@@ -3,6 +3,12 @@ services:
     image: neuron404
     container_name: neuron404
     build: .
+    environment:
+      NEURON404_AUTH_TOKEN: ${NEURON404_AUTH_TOKEN:-}
+      NEURON404_READ_TOKEN: ${NEURON404_READ_TOKEN:-}
+      NEURON404_PUBLIC_URL: ${NEURON404_PUBLIC_URL:-}
+      PROTOCOL_HEADER: x-forwarded-proto
+      BODY_SIZE_LIMIT: 1M
     restart: unless-stopped
     init: true
     user: '${NEURON404_UID:-1000}:${NEURON404_GID:-1000}'

@@ -20,6 +20,7 @@ export default defineConfig({
         rolldownOptions: {
             input: {
                 'docker-init': fileURLToPath(new URL('scripts/docker-init.ts', import.meta.url)),
+                server: fileURLToPath(new URL('scripts/server.ts', import.meta.url)),
                 neuron: fileURLToPath(new URL('scripts/neuron.ts', import.meta.url)),
                 maintenance: fileURLToPath(new URL('scripts/maintenance.ts', import.meta.url)),
             },

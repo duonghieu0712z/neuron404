@@ -7,8 +7,16 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'NEURON404_');
-    if (env.NEURON404_DATA_DIR && !process.env.NEURON404_DATA_DIR)
-        process.env.NEURON404_DATA_DIR = env.NEURON404_DATA_DIR;
+    for (const name of [
+        'NEURON404_DATA_DIR',
+        'NEURON404_AUTH_TOKEN',
+        'NEURON404_READ_TOKEN',
+        'NEURON404_PUBLIC_URL',
+    ]) {
+        if (env[name] && !process.env[name]) {
+            process.env[name] = env[name];
+        }
+    }
 
     return {
         build: {

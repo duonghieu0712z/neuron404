@@ -30,4 +30,4 @@ RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 3000
 ENTRYPOINT ["sh", "docker-entrypoint.sh"]
-CMD ["node", "build/index.js"]
+CMD ["node", "dist/server.js"]
