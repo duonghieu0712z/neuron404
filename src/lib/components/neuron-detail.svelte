@@ -3,6 +3,7 @@
 
     import { resolve } from '$app/paths';
 
+    import KnowledgeReview from '#lib/components/knowledge-review.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
 
@@ -56,6 +57,7 @@
 {/snippet}
 
 {#snippet synapses()}
+    <KnowledgeReview reports={data.reviews} />
     {#if data.neuron.supersededBy}
         <Card size={layout === 'panel' ? 'sm' : 'default'}>
             <CardHeader><CardTitle class="text-sm">Superseded</CardTitle></CardHeader>

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 
 import { db } from '#lib/server/db';
 import { neurons, synapses } from '#lib/server/db/schema';
+import { readRegionReviews } from '#lib/server/maintenance/reports';
 
 import { synchronizeIndexUnlocked } from './indexer';
 import { readRegions } from './regions';
@@ -42,6 +43,15 @@ export async function getNeuronDetail(id: string) {
                 source: { title, uri, locator },
             }),
         );
-        return { neuron, outgoing, incoming, regions, sources };
+        const reviews = (await Promise.all(regions.map((region) => readRegionReviews(region.id))))
+            .flat()
+            .filter((report) => report.kind === 'knowledge')
+            .map((report) => ({
+                ...report,
+                checks: report.checks.filter((check) => check.subject === id),
+                findings: report.findings.filter((finding) => finding.neurons.includes(id)),
+            }))
+            .filter((report) => report.checks.length || report.findings.length);
+        return { neuron, outgoing, incoming, regions, sources, reviews };
     });
 }

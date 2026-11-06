@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { RegionOverview } from '#lib/server/neuron/region-overview';
 
+    import KnowledgeReview from '#lib/components/knowledge-review.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
 
@@ -64,6 +65,7 @@
             <p class="text-muted-foreground">No overview has been written for this Region yet.</p>
         {/each}
     </div>
+    <KnowledgeReview reports={data.reviews} />
     <section class="space-y-3 border-t pt-4">
         <h2 class="text-sm font-semibold">Explore this region</h2>
         <div class="space-y-1">
