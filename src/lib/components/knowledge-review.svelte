@@ -3,24 +3,29 @@
 
     import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
+    import DetailSection from '#lib/components/detail-section.svelte';
+    import ReviewEvidence from '#lib/components/review-evidence.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
-    import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
     import {
         Collapsible,
         CollapsibleContent,
         CollapsibleTrigger,
     } from '#lib/components/ui/collapsible';
 
-    let { reports }: { reports: ReviewView[] } = $props();
+    let {
+        reports,
+        onSelectNeuron,
+    }: { reports: ReviewView[]; onSelectNeuron?: (id: string) => void } = $props();
 </script>
 
 {#each reports as report (report.id)}
-    <Card size="sm">
-        <CardHeader class="gap-2">
-            <CardTitle class="text-sm">
-                {report.kind === 'overview' ? 'Overview fidelity' : 'Knowledge review'}
-            </CardTitle>
+    <DetailSection
+        title={report.kind === 'overview' ? 'Overview fidelity' : 'Knowledge review'}
+        count={report.findings.length}
+        open={false}
+    >
+        {#snippet summary()}
             <div class="flex flex-wrap gap-1.5">
                 <Badge variant="outline">
                     {report.verdict === 'pass' ? 'Checks passed' : 'Needs review'}
@@ -30,14 +35,15 @@
                     <Badge variant="outline">Different overview revision</Badge>
                 {/if}
             </div>
+        {/snippet}
+        <div class="space-y-3">
             <p class="text-xs leading-relaxed text-muted-foreground">{report.summary}</p>
             <p class="text-xs text-muted-foreground">
                 {report.createdAt.slice(0, 10)} · Checked against supplied evidence, not independent confirmation
                 of truth.
             </p>
             <p class="text-xs leading-relaxed text-muted-foreground">{report.coverage}</p>
-        </CardHeader>
-        <CardContent class="space-y-3">
+
             {#each report.findings as finding (finding.id)}
                 <section class="space-y-2 border-t pt-3 text-xs leading-relaxed">
                     <div class="flex flex-wrap items-center gap-1.5">
@@ -57,14 +63,11 @@
                                 .synapse.target}
                         </p>
                     {/if}
-                    {#each finding.evidence as evidence, index (index)}
-                        <blockquote class="border-l pl-3 whitespace-pre-wrap">
-                            {evidence.quote}
-                        </blockquote>
-                        <p class="break-all text-muted-foreground">
-                            {evidence.kind}: {evidence.id}
-                        </p>
-                    {/each}
+                    <ReviewEvidence
+                        evidence={finding.evidence}
+                        details={report.evidenceDetails}
+                        {onSelectNeuron}
+                    />
                     {#if finding.note}<p class="text-muted-foreground">
                             Decision: {finding.note}
                         </p>{/if}
@@ -91,19 +94,16 @@
                         <section class="space-y-1 text-xs leading-relaxed">
                             <p class="font-medium break-all">{check.subject} · {check.verdict}</p>
                             <p class="text-muted-foreground">{check.reason}</p>
-                            {#each check.evidence as evidence, index (index)}
-                                <blockquote class="border-l pl-3 whitespace-pre-wrap">
-                                    {evidence.quote}
-                                </blockquote>
-                                <p class="break-all text-muted-foreground">
-                                    {evidence.kind}: {evidence.id}
-                                </p>
-                            {/each}
+                            <ReviewEvidence
+                                evidence={check.evidence}
+                                details={report.evidenceDetails}
+                                {onSelectNeuron}
+                            />
                         </section>
                     {/each}
                 </CollapsibleContent>
             </Collapsible>
             <p class="text-[10px] break-all text-muted-foreground">Report {report.id}</p>
-        </CardContent>
-    </Card>
+        </div>
+    </DetailSection>
 {/each}

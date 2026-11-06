@@ -74,7 +74,26 @@ export interface ReviewReport {
     findings: ReviewFinding[];
 }
 export interface ReviewView extends ReviewReport {
+    evidenceDetails: Record<
+        string,
+        {
+            title: string;
+            available: boolean;
+            leading: boolean;
+            trailing: boolean;
+            matchesCurrent: boolean;
+        }
+    >;
     stale: boolean;
     appliesToCurrentOverview: boolean;
     findings: (ReviewFinding & { status: 'open' | 'resolved' | 'dismissed'; note?: string })[];
+}
+
+export function reviewEvidenceKey(evidence: { kind: string; id: string; quote: string }) {
+    let hash = 0xcbf29ce484222325n;
+    for (const character of evidence.quote) {
+        hash ^= BigInt(character.codePointAt(0)!);
+        hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+    }
+    return `${evidence.kind}:${evidence.id}:${hash.toString(16)}`;
 }

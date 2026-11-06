@@ -120,3 +120,63 @@
         @apply font-sans;
     }
 }
+
+@layer components {
+    .markdown-content {
+        overflow-wrap: anywhere;
+    }
+    .markdown-content :is(h1, h2, h3, h4, h5, h6) {
+        @apply mt-6 mb-3 font-semibold tracking-tight;
+    }
+    .markdown-content h1 {
+        @apply text-xl;
+    }
+    .markdown-content h2 {
+        @apply text-lg;
+    }
+    .markdown-content :is(h3, h4, h5, h6) {
+        @apply text-base;
+    }
+    .markdown-content p {
+        @apply my-3;
+    }
+    .markdown-content a {
+        @apply font-medium underline-offset-4 hover:underline;
+    }
+    .markdown-content :is(ul, ol) {
+        @apply my-3 space-y-1 pl-6;
+    }
+    .markdown-content ul {
+        @apply list-disc;
+    }
+    .markdown-content ol {
+        @apply list-decimal;
+    }
+    .markdown-content blockquote {
+        @apply my-4 border-l-2 pl-4 text-muted-foreground;
+    }
+    .markdown-content code {
+        @apply rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.875em];
+    }
+    .markdown-content pre {
+        @apply my-3 rounded-sm bg-muted p-3 whitespace-pre-wrap;
+    }
+    .markdown-content pre code {
+        @apply bg-transparent p-0;
+    }
+    .markdown-content [data-markdown-scroll] pre {
+        @apply m-0 whitespace-pre;
+    }
+    .markdown-content table {
+        @apply my-3 w-full border-collapse text-left text-sm;
+    }
+    .markdown-content :is(th, td) {
+        @apply border px-3 py-2 align-top;
+    }
+    .markdown-content th {
+        @apply bg-muted font-semibold;
+    }
+    .markdown-content hr {
+        @apply my-6 border-t;
+    }
+}

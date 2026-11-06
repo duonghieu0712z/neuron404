@@ -3,7 +3,9 @@
 
     import { resolve } from '$app/paths';
 
+    import DetailSection from '#lib/components/detail-section.svelte';
     import KnowledgeReview from '#lib/components/knowledge-review.svelte';
+    import MarkdownContent from '#lib/components/markdown-content.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
 
@@ -25,39 +27,36 @@
 </script>
 
 {#snippet metadata()}
-    <Card size={layout === 'panel' ? 'sm' : 'default'}>
-        <CardHeader class="gap-1.5">
-            <CardTitle class="text-sm text-muted-foreground uppercase">Metadata</CardTitle>
-            <div class="flex flex-wrap gap-1.5 pt-1">
-                <Badge variant="outline">{data.neuron.status}</Badge>
-                {#if data.neuron.lifecycle !== 'active'}
-                    <Badge variant="outline">{data.neuron.lifecycle}</Badge>
-                {/if}
-                <Badge variant="outline">grounding: {data.neuron.grounding}</Badge>
-                <Badge variant="outline">endorsement: {data.neuron.endorsement}</Badge>
-                <Badge variant="outline">provenance: {data.neuron.provenance}</Badge>
-            </div>
-            {#if data.regions.length > 0}
-                <div class="flex flex-wrap gap-1.5 pt-2" aria-label="Regions">
-                    {#each data.regions as region (region.id)}
-                        <Badge variant="secondary">{region.title}</Badge>
-                    {/each}
-                </div>
+    <DetailSection title="Metadata" size={layout === 'panel' ? 'sm' : 'default'}>
+        <div class="flex flex-wrap gap-1.5 pt-1">
+            <Badge variant="outline">{data.neuron.status}</Badge>
+            {#if data.neuron.lifecycle !== 'active'}
+                <Badge variant="outline">{data.neuron.lifecycle}</Badge>
             {/if}
-        </CardHeader>
-    </Card>
+            <Badge variant="outline">grounding: {data.neuron.grounding}</Badge>
+            <Badge variant="outline">endorsement: {data.neuron.endorsement}</Badge>
+            <Badge variant="outline">provenance: {data.neuron.provenance}</Badge>
+        </div>
+        {#if data.regions.length > 0}
+            <div class="flex flex-wrap gap-1.5 pt-2" aria-label="Regions">
+                {#each data.regions as region (region.id)}
+                    <Badge variant="secondary">{region.title}</Badge>
+                {/each}
+            </div>
+        {/if}
+    </DetailSection>
 {/snippet}
 
 {#snippet body()}
     <Card size={layout === 'panel' ? 'sm' : 'default'}>
         <CardContent>
-            <div class="text-sm whitespace-pre-wrap">{data.neuron.body}</div>
+            <MarkdownContent content={data.neuron.body} {onSelectNeuron} />
         </CardContent>
     </Card>
 {/snippet}
 
 {#snippet synapses()}
-    <KnowledgeReview reports={data.reviews} />
+    <KnowledgeReview reports={data.reviews} {onSelectNeuron} />
     {#if data.neuron.supersededBy}
         <Card size={layout === 'panel' ? 'sm' : 'default'}>
             <CardHeader><CardTitle class="text-sm">Superseded</CardTitle></CardHeader>
@@ -73,75 +72,73 @@
         </Card>
     {/if}
     {#if data.sources.length > 0}
-        <Card size={layout === 'panel' ? 'sm' : 'default'}>
-            <CardHeader><CardTitle class="text-sm">Sources</CardTitle></CardHeader>
-            <CardContent>
-                <ul class="space-y-3 text-sm">
-                    {#each data.sources as entry (entry.id)}
-                        <li>
-                            <p class="font-medium">{entry.source.title}</p>
-                            <p class="text-xs break-all text-muted-foreground">
-                                {entry.source.uri}
-                            </p>
-                            {#if entry.source.locator}<p class="text-xs text-muted-foreground">
-                                    {entry.source.locator}
-                                </p>{/if}
-                        </li>
-                    {/each}
-                </ul>
-            </CardContent>
-        </Card>
+        <DetailSection
+            title="Sources"
+            count={data.sources.length}
+            size={layout === 'panel' ? 'sm' : 'default'}
+            open={false}
+        >
+            <ul class="space-y-3 text-sm">
+                {#each data.sources as entry (entry.id)}
+                    <li>
+                        <p class="font-medium">{entry.source.title}</p>
+                        <p class="text-xs break-all text-muted-foreground">
+                            {entry.source.uri}
+                        </p>
+                        {#if entry.source.locator}<p class="text-xs text-muted-foreground">
+                                {entry.source.locator}
+                            </p>{/if}
+                    </li>
+                {/each}
+            </ul>
+        </DetailSection>
     {/if}
     {#if data.outgoing.length > 0}
-        <Card size={layout === 'panel' ? 'sm' : 'default'}>
-            <CardHeader>
-                <CardTitle class="text-sm text-muted-foreground uppercase">
-                    Outgoing synapses
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <ul class="space-y-1">
-                    {#each data.outgoing as synapse (synapse.id)}
-                        <li class="text-sm">
-                            <span class="text-muted-foreground">{synapse.kind}</span>
-                            <a
-                                href={resolve('/neurons/[id]', { id: synapse.target.id })}
-                                class="font-medium hover:underline"
-                                onclick={(event) => handleSynapseClick(event, synapse.target.id)}
-                            >
-                                {synapse.target.title}
-                            </a>
-                        </li>
-                    {/each}
-                </ul>
-            </CardContent>
-        </Card>
+        <DetailSection
+            title="Outgoing synapses"
+            count={data.outgoing.length}
+            size={layout === 'panel' ? 'sm' : 'default'}
+            open={true}
+        >
+            <ul class="space-y-1">
+                {#each data.outgoing as synapse (synapse.id)}
+                    <li class="text-sm">
+                        <span class="text-muted-foreground">{synapse.kind}</span>
+                        <a
+                            href={resolve('/neurons/[id]', { id: synapse.target.id })}
+                            class="font-medium hover:underline"
+                            onclick={(event) => handleSynapseClick(event, synapse.target.id)}
+                        >
+                            {synapse.target.title}
+                        </a>
+                    </li>
+                {/each}
+            </ul>
+        </DetailSection>
     {/if}
 
     {#if data.incoming.length > 0}
-        <Card size={layout === 'panel' ? 'sm' : 'default'}>
-            <CardHeader>
-                <CardTitle class="text-sm text-muted-foreground uppercase">
-                    Incoming synapses
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <ul class="space-y-1">
-                    {#each data.incoming as synapse (synapse.id)}
-                        <li class="text-sm">
-                            <a
-                                href={resolve('/neurons/[id]', { id: synapse.source.id })}
-                                class="font-medium hover:underline"
-                                onclick={(event) => handleSynapseClick(event, synapse.source.id)}
-                            >
-                                {synapse.source.title}
-                            </a>
-                            <span class="text-muted-foreground">{synapse.kind} this</span>
-                        </li>
-                    {/each}
-                </ul>
-            </CardContent>
-        </Card>
+        <DetailSection
+            title="Incoming synapses"
+            count={data.incoming.length}
+            size={layout === 'panel' ? 'sm' : 'default'}
+            open={true}
+        >
+            <ul class="space-y-1">
+                {#each data.incoming as synapse (synapse.id)}
+                    <li class="text-sm">
+                        <a
+                            href={resolve('/neurons/[id]', { id: synapse.source.id })}
+                            class="font-medium hover:underline"
+                            onclick={(event) => handleSynapseClick(event, synapse.source.id)}
+                        >
+                            {synapse.source.title}
+                        </a>
+                        <span class="text-muted-foreground">{synapse.kind} this</span>
+                    </li>
+                {/each}
+            </ul>
+        </DetailSection>
     {/if}
 {/snippet}
 

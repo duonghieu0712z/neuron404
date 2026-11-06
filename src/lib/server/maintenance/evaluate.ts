@@ -10,6 +10,7 @@ import { fingerprint } from '#lib/server/neuron/storage';
 import { readNeuronSnapshot } from '#lib/server/neuron/store';
 
 import { generateStructured } from './model';
+import { evidencePassages } from './passages';
 import { openReviewFindings, readLatestReport } from './reports';
 
 type Snapshot = Awaited<ReturnType<typeof readNeuronSnapshot>>;
@@ -126,10 +127,8 @@ const modelReviewSchema = reviewOutputSchema.extend({
 function referenceInput(bundle: ReviewBundle, body?: string) {
     const evidence = new Map<string, ReviewOutput['checks'][number]['evidence'][number]>();
     function passages(kind: 'neuron' | 'source' | 'overview', id: string, text: string) {
-        const points = Array.from(text);
         const result = [];
-        for (let index = 0; index < points.length; index += 1200) {
-            const quote = points.slice(index, index + 1200).join('');
+        for (const quote of evidencePassages(text)) {
             const ref = `e${evidence.size + 1}`;
             evidence.set(ref, { kind, id, quote });
             result.push({ ref, kind, id, text: quote });
@@ -324,7 +323,7 @@ function validate(
                           {
                               kind: 'neuron',
                               id: check.subject,
-                              quote: member.neuron.body.slice(0, 500),
+                              quote: evidencePassages(member.neuron.body)[0],
                           },
                       ],
                 synapse: null,

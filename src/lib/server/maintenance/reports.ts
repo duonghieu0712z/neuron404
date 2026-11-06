@@ -6,15 +6,18 @@ import { appendFile, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 import matter from '@11ty/gray-matter';
+import { inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { reviewFindingSchema, reviewOutputSchema } from '#lib/neuron/review';
+import { reviewEvidenceKey, reviewFindingSchema, reviewOutputSchema } from '#lib/neuron/review';
 import { regionIdSchema } from '#lib/neuron/schema';
 import { DATA_DIR } from '#lib/server/data-dir';
+import { neurons } from '#lib/server/db/schema';
 import { readIndexSnapshots, withIndexedStore } from '#lib/server/neuron/indexed-store';
 import { readRegions } from '#lib/server/neuron/regions';
 import { readSource } from '#lib/server/neuron/sources';
 import { atomicWrite, CONTENT_DIR, fingerprint, withStorageLock } from '#lib/server/neuron/storage';
+import { readNeuronSnapshot } from '#lib/server/neuron/store';
 
 const hashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const revisionsSchema = z.record(z.string(), hashSchema);
@@ -246,16 +249,80 @@ export async function readRegionReviews(
     );
     const overviewHash =
         overviewRaw === null ? null : fingerprint(matter(overviewRaw, {}).content.trim());
+    const evidenceSources = new Map<string, { title: string; body: string }>();
+    const evidenceIds = [
+        ...new Set(
+            reports
+                .flatMap((report) => [
+                    ...report.findings.flatMap((finding) => finding.evidence),
+                    ...report.checks.flatMap((check) => check.evidence),
+                ])
+                .filter((item) => item.kind === 'neuron')
+                .map((item) => item.id),
+        ),
+    ];
+    const evidenceNeurons = db
+        ? evidenceIds.length
+            ? await db
+                  .select({ id: neurons.id, title: neurons.title, body: neurons.body })
+                  .from(neurons)
+                  .where(inArray(neurons.id, evidenceIds))
+            : []
+        : (
+              await Promise.all(
+                  evidenceIds.map(async (id) => {
+                      try {
+                          return (await readNeuronSnapshot(id)).neuron;
+                      } catch {
+                          return null;
+                      }
+                  }),
+              )
+          ).filter((neuron) => neuron !== null);
+    for (const neuron of evidenceNeurons)
+        evidenceSources.set(`neuron:${neuron.id}`, { title: neuron.title, body: neuron.body });
+    if (region && overviewRaw !== null)
+        evidenceSources.set(`overview:${regionId}`, {
+            title: region.title,
+            body: matter(overviewRaw, {}).content.trim(),
+        });
     const unavailable = new Set<string>();
     for (const id of new Set(reports.flatMap((report) => report.sources))) {
         try {
-            await readSource(id);
+            const { source } = await readSource(id);
+            evidenceSources.set(`source:${id}`, { title: source.title, body: source.content });
         } catch {
             unavailable.add(id);
         }
     }
     return reports.map((report) => ({
         ...report,
+        evidenceDetails: Object.fromEntries(
+            [
+                ...report.findings.flatMap((finding) => finding.evidence),
+                ...report.checks.flatMap((check) => check.evidence),
+            ].map((evidence) => {
+                const source = evidenceSources.get(`${evidence.kind}:${evidence.id}`);
+                const offset = source?.body.indexOf(evidence.quote) ?? -1;
+                return [
+                    reviewEvidenceKey(evidence),
+                    {
+                        title:
+                            source?.title ??
+                            (evidence.kind === 'neuron'
+                                ? 'Unavailable neuron'
+                                : evidence.kind === 'overview'
+                                  ? 'Region overview'
+                                  : 'Unavailable source'),
+                        available: source !== undefined,
+                        matchesCurrent: offset >= 0,
+                        leading: offset > 0,
+                        trailing:
+                            offset >= 0 && offset + evidence.quote.length < source!.body.length,
+                    },
+                ];
+            }),
+        ),
         stale:
             fingerprint(JSON.stringify(region ?? null)) !== report.regionRevision ||
             members.length !== Object.keys(report.members).length ||
