@@ -2,16 +2,22 @@
     import type { PageProps } from './$types';
     import type { SimulationLinkDatum, SimulationNodeDatum } from 'd3-force';
 
+    import EyeOffIcon from '@lucide/svelte/icons/eye-off';
     import MaximizeIcon from '@lucide/svelte/icons/maximize';
     import MinusIcon from '@lucide/svelte/icons/minus';
+    import MousePointer2Icon from '@lucide/svelte/icons/mouse-pointer-2';
     import PauseIcon from '@lucide/svelte/icons/pause';
     import PlayIcon from '@lucide/svelte/icons/play';
     import PlusIcon from '@lucide/svelte/icons/plus';
+    import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
     import TagsIcon from '@lucide/svelte/icons/tags';
+    import WaypointsIcon from '@lucide/svelte/icons/waypoints';
+    import { invalidateAll } from '$app/navigation';
     import Network from 'graphology';
     import { mode } from 'mode-watcher';
     import Sigma, { DEFAULT_DEPTH_LAYERS, DEFAULT_STYLES } from 'sigma';
     import { layerPlain, sdfCircle } from 'sigma/rendering';
+    import { onMount, tick, untrack } from 'svelte';
 
     import NetworkSection from '#lib/components/network-section.svelte';
     import { Badge } from '#lib/components/ui/badge';
@@ -25,10 +31,17 @@
         TooltipTrigger,
     } from '#lib/components/ui/tooltip';
     import { getEdgeAppearance } from '#lib/network/edge-appearance';
-    import { chooseLabelPlacements, type LabelPlacement } from '#lib/network/labels';
+    import { chooseLabelPlacements, labelBox, type LabelPlacement } from '#lib/network/labels';
+    import {
+        getVisibleMembershipLinks,
+        isMembershipMode,
+        MEMBERSHIP_MODES,
+        type MembershipMode,
+    } from '#lib/network/membership';
     import { getRegionNodeId, regionHexagon } from '#lib/network/region-node';
     import { getRegionHull } from '#lib/network/regions';
     import { createNetworkSimulation, getNodeEntranceOffset } from '#lib/network/simulation';
+    import { createSynapseSignals } from '#lib/network/synapse-signals';
     import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
     import { GROUNDING_LEVELS, SYNAPSE_KINDS } from '#lib/neuron/schema';
 
@@ -84,6 +97,7 @@
         nodeColor: true,
         stroke: true,
         edgeColor: true,
+        membership: true,
     });
     const theme = $derived(mode.current === 'dark' ? 'dark' : 'light');
     const groundingCounts = $derived(
@@ -109,11 +123,68 @@
     const selectedRegionId = $derived(panel.region?.region.id ?? null);
     let showLabels = $state(true);
     let motionEnabled = $state(true);
+    let membershipMode = $state<MembershipMode>('auto');
+    const membershipLabel = $derived(
+        MEMBERSHIP_MODES.find((mode) => mode.value === membershipMode)!.label,
+    );
+    const nextMembershipMode = $derived(
+        MEMBERSHIP_MODES[
+            (MEMBERSHIP_MODES.findIndex((mode) => mode.value === membershipMode) + 1) %
+                MEMBERSHIP_MODES.length
+        ],
+    );
+    const membershipCount = $derived(
+        data.regions.reduce((count, region) => count + region.nodeIds.length, 0),
+    );
+    let applyMembership = $state<((mode: MembershipMode) => void) | null>(null);
     let reducedMotion = $state(false);
     let applyMotion = $state<((enabled: boolean) => void) | null>(null);
     let applyLabels = $state<((visible: boolean) => void) | null>(null);
     let applyFocus = $state<((id: string | null, selected: string | null) => void) | null>(null);
+    let layoutRevision = $state(0);
+    let refreshing = $state(false);
+    let refreshFeedback = $state(false);
     const positions: Record<string, { x: number; y: number } | undefined> = {};
+
+    const PREFERENCES_KEY = 'neuron404:network-preferences';
+    let preferencesReady = $state(false);
+
+    onMount(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? 'null');
+            if (saved && typeof saved === 'object') {
+                if (typeof saved.overviewOpen === 'boolean') overviewOpen = saved.overviewOpen;
+                if (typeof saved.controlsOpen === 'boolean') controlsOpen = saved.controlsOpen;
+                if (typeof saved.showLabels === 'boolean') showLabels = saved.showLabels;
+                if (typeof saved.motionEnabled === 'boolean') motionEnabled = saved.motionEnabled;
+                if (isMembershipMode(saved.membershipMode)) membershipMode = saved.membershipMode;
+                for (const key of Object.keys(sections) as (keyof typeof sections)[]) {
+                    if (typeof saved.sections?.[key] === 'boolean')
+                        sections[key] = saved.sections[key];
+                }
+            }
+        } catch {
+            // Keep defaults when browser storage is unavailable or invalid.
+        }
+        preferencesReady = true;
+    });
+
+    $effect(() => {
+        if (!preferencesReady) return;
+        const preferences = JSON.stringify({
+            overviewOpen,
+            controlsOpen,
+            showLabels,
+            motionEnabled,
+            membershipMode,
+            sections,
+        });
+        try {
+            localStorage.setItem(PREFERENCES_KEY, preferences);
+        } catch {
+            // Browsing remains available when storage is disabled or full.
+        }
+    });
 
     function fitNetworkInView() {
         if (!renderer) return;
@@ -145,7 +216,28 @@
         void renderer.getCamera().animate({ ...cameraState, ratio }, { duration: 250 });
     }
 
+    async function refreshNetwork() {
+        if (refreshing) return;
+        refreshing = true;
+        refreshFeedback = true;
+        try {
+            await invalidateAll();
+            for (const id of Object.keys(positions)) delete positions[id];
+            layoutRevision++;
+            await tick();
+            renderer?.refresh();
+            fitNetworkInView();
+        } finally {
+            refreshing = false;
+        }
+    }
+
     const controls = [
+        {
+            label: 'Refresh network',
+            icon: RefreshCwIcon,
+            action: refreshNetwork,
+        },
         {
             label: 'Zoom in',
             icon: PlusIcon,
@@ -192,6 +284,10 @@
     });
 
     $effect(() => {
+        applyMembership?.(membershipMode);
+    });
+
+    $effect(() => {
         const media = window.matchMedia('(prefers-reduced-motion: reduce)');
         const updatePreference = () => {
             reducedMotion = media.matches;
@@ -206,7 +302,8 @@
     });
 
     $effect(() => {
-        if (!containerEl || data.nodes.length === 0) return;
+        if (!preferencesReady || !containerEl || data.nodes.length === 0) return;
+        void layoutRevision;
 
         const isDark = mode.current === 'dark';
         const theme = isDark ? 'dark' : 'light';
@@ -215,8 +312,10 @@
         let activeNode: string | null = null;
         let selectedNode: string | null = null;
         let neuronLabelsVisible = true;
+        let visibleMembershipMode = untrack(() => membershipMode);
         let neighborhood = new Set<string>();
         let labelPlacements = new Map<string, LabelPlacement>();
+        let signalLabelMasks: ReturnType<typeof labelBox>[] = [];
         const compactLabels: Record<string, string | undefined> = Object.create(null);
 
         const regionByNodeId = new Map(
@@ -258,7 +357,9 @@
 
         const hasSavedPositions = simNodes.every((node) => positions[node.id]);
         let entranceActive =
-            !hasSavedPositions && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            !hasSavedPositions &&
+            untrack(() => motionEnabled) &&
+            !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const simulation = createNetworkSimulation(simNodes, simLinks, !hasSavedPositions);
 
         const network = new Network({ multi: true, type: 'directed' });
@@ -476,6 +577,9 @@
                     };
                 });
             const next = chooseLabelPlacements(candidates, width, height);
+            signalLabelMasks = candidates
+                .filter((candidate) => next.has(candidate.id))
+                .map((candidate) => labelBox(candidate, next.get(candidate.id)!));
             const changed = network
                 .nodes()
                 .filter(
@@ -556,9 +660,91 @@
                 regionContext.stroke();
                 regionContext.globalAlpha = 1;
             }
+            regionContext.save();
+            regionContext.setLineDash([4, 5]);
+            regionContext.lineWidth = 1;
+            regionContext.strokeStyle = REGION_COLOR[theme];
+            for (const link of getVisibleMembershipLinks(
+                data.regions,
+                visibleMembershipMode,
+                activeNode,
+                selectedNode,
+            )) {
+                if (
+                    sigmaInstance.getNodeState(link.source).isHidden ||
+                    sigmaInstance.getNodeState(link.target).isHidden
+                )
+                    continue;
+                const source = network.getNodeAttributes(link.source);
+                const target = network.getNodeAttributes(link.target);
+                const start = sigmaInstance.graphToViewport({ x: source.x, y: source.y });
+                const end = sigmaInstance.graphToViewport({ x: target.x, y: target.y });
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+                const distance = Math.hypot(dx, dy);
+                const sourceInset = sigmaInstance.scaleSize(source.size) + 4;
+                const targetInset = sigmaInstance.scaleSize(target.size) + 3;
+                if (distance <= sourceInset + targetInset) continue;
+                regionContext.globalAlpha = link.emphasized
+                    ? 0.6
+                    : activeNode || selectedNode
+                      ? 0.16
+                      : 0.3;
+                regionContext.beginPath();
+                regionContext.moveTo(
+                    start.x + (dx * sourceInset) / distance,
+                    start.y + (dy * sourceInset) / distance,
+                );
+                regionContext.lineTo(
+                    end.x - (dx * targetInset) / distance,
+                    end.y - (dy * targetInset) / distance,
+                );
+                regionContext.stroke();
+            }
+            regionContext.restore();
         };
         sigmaInstance.on('afterRender', drawRegions);
         sigmaInstance.scheduleRender();
+        const synapseSignals = createSynapseSignals(sigmaInstance, () => signalLabelMasks);
+        const updateSignals = () => {
+            synapseSignals.setLinks([
+                ...simLinks.flatMap((link, index) => {
+                    const connected =
+                        activeNode &&
+                        (regionByNodeId.has(activeNode)
+                            ? neighborhood.has(link.sourceId) && neighborhood.has(link.targetId)
+                            : link.sourceId === activeNode || link.targetId === activeNode);
+                    return connected
+                        ? [
+                              {
+                                  id: `${link.sourceId}:${link.targetId}:${link.kind}:${index}`,
+                                  source: link.sourceId,
+                                  target: link.targetId,
+                                  color: SYNAPSE_COLORS[link.kind as SynapseKind][theme],
+                              },
+                          ]
+                        : [];
+                }),
+                ...getVisibleMembershipLinks(
+                    data.regions,
+                    visibleMembershipMode,
+                    activeNode,
+                    selectedNode,
+                )
+                    .filter((link) => link.emphasized)
+                    .map((link) => ({
+                        id: `membership:${link.source}:${link.target}`,
+                        source: link.source,
+                        target: link.target,
+                        color: REGION_COLOR[theme],
+                    })),
+            ]);
+        };
+        applyMembership = (mode) => {
+            visibleMembershipMode = mode;
+            updateSignals();
+            sigmaInstance.scheduleRender();
+        };
         applyLabels = (visible) => {
             neuronLabelsVisible = visible;
             sigmaInstance.refresh();
@@ -580,6 +766,7 @@
                           ]
                     : [],
             );
+            updateSignals();
             sigmaInstance.refresh();
         };
 
@@ -653,6 +840,7 @@
 
         applyMotion = (enabled) => {
             motionAllowed = enabled;
+            synapseSignals.setEnabled(enabled);
             if (!enabled) freezePositions();
             else if (!document.hidden) {
                 if (entranceActive) startMotion();
@@ -719,6 +907,7 @@
 
         return () => {
             disposed = true;
+            synapseSignals.dispose();
             sigmaInstance.off('beforeRender', layoutLabels);
             sigmaInstance.off('afterRender', drawRegions);
             resizeObserver.disconnect();
@@ -728,6 +917,7 @@
             applyMotion = null;
             applyFocus = null;
             applyLabels = null;
+            applyMembership = null;
             renderer = null;
             sigmaInstance.kill();
         };
@@ -741,18 +931,21 @@
 {#snippet legendRow(
     label: string,
     count: number,
-    shape: 'circle' | 'hexagon' | 'line',
+    shape: 'circle' | 'hexagon' | 'line' | 'dashed',
     color = 'currentColor',
 )}
     <div class="flex items-center gap-2 text-xs">
         <span class="flex w-4 shrink-0 items-center justify-center" aria-hidden="true">
             <span
-                class={shape === 'line'
-                    ? 'h-0.5 w-4'
-                    : shape === 'circle'
-                      ? 'size-2.5 rounded-full'
-                      : 'h-3 w-2.5'}
-                style:background-color={color}
+                class={shape === 'dashed'
+                    ? 'w-4 border-t border-dashed'
+                    : shape === 'line'
+                      ? 'h-0.5 w-4'
+                      : shape === 'circle'
+                        ? 'size-2.5 rounded-full'
+                        : 'h-3 w-2.5'}
+                style:background-color={shape === 'dashed' ? undefined : color}
+                style:border-color={shape === 'dashed' ? color : undefined}
                 style:clip-path={shape === 'hexagon'
                     ? 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)'
                     : undefined}
@@ -890,6 +1083,19 @@
                                         {/each}
                                     </div>
                                 </NetworkSection>
+                                <NetworkSection
+                                    title="Region membership"
+                                    bind:open={sections.membership}
+                                >
+                                    <div class="space-y-1.5 px-2 py-1.5">
+                                        {@render legendRow(
+                                            'Dashed · member link',
+                                            membershipCount,
+                                            'dashed',
+                                            REGION_COLOR[theme],
+                                        )}
+                                    </div>
+                                </NetworkSection>
                             </div>
                         </ScrollArea>
                     </NetworkSection>
@@ -927,16 +1133,68 @@
                                         variant="ghost"
                                         size="icon-sm"
                                         aria-label={control.label}
-                                        disabled={!renderer}
+                                        aria-busy={control.action === refreshNetwork
+                                            ? refreshing
+                                            : undefined}
+                                        class={control.action === refreshNetwork
+                                            ? 'group motion-safe:transition-transform motion-safe:active:scale-90'
+                                            : undefined}
+                                        disabled={!renderer ||
+                                            (refreshing && control.action !== refreshNetwork)}
                                         onclick={() => void control.action()}
                                     >
-                                        <control.icon class="size-4" />
+                                        {#if control.action === refreshNetwork}
+                                            <span
+                                                class="inline-flex motion-safe:transition-transform motion-safe:duration-300 motion-safe:group-hover:rotate-90"
+                                            >
+                                                <control.icon
+                                                    class={[
+                                                        'size-4',
+                                                        (refreshing || refreshFeedback) &&
+                                                            'motion-safe:animate-[spin_600ms_linear_infinite]',
+                                                    ]}
+                                                    onanimationiteration={() => {
+                                                        if (!refreshing) refreshFeedback = false;
+                                                    }}
+                                                />
+                                            </span>
+                                        {:else}
+                                            <control.icon class="size-4" />
+                                        {/if}
                                     </Button>
                                 {/snippet}
                             </TooltipTrigger>
                             <TooltipContent side="left">{control.label}</TooltipContent>
                         </Tooltip>
                     {/each}
+                    <Tooltip>
+                        <TooltipTrigger>
+                            {#snippet child({ props })}
+                                <Button
+                                    {...props}
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={`Region membership: ${membershipLabel}. Switch to ${nextMembershipMode.label}.`}
+                                    data-membership-mode={membershipMode}
+                                    disabled={!renderer}
+                                    onclick={() => {
+                                        membershipMode = nextMembershipMode.value;
+                                    }}
+                                >
+                                    {#if membershipMode === 'hidden'}
+                                        <EyeOffIcon class="size-4" />
+                                    {:else if membershipMode === 'auto'}
+                                        <MousePointer2Icon class="size-4" />
+                                    {:else}
+                                        <WaypointsIcon class="size-4" />
+                                    {/if}
+                                </Button>
+                            {/snippet}
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                            Region membership: {membershipLabel} · Next: {nextMembershipMode.label}
+                        </TooltipContent>
+                    </Tooltip>
                     <Tooltip>
                         <TooltipTrigger>
                             {#snippet child({ props })}

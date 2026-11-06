@@ -21,7 +21,7 @@ function intersects(a: Box, b: Box) {
     return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
-function labelBox(node: LabelCandidate, placement: LabelPlacement): Box {
+export function labelBox(node: LabelCandidate, placement: LabelPlacement): Box {
     const gap = node.radius + 5;
     const halfWidth = node.width / 2 + (node.required ? 8 : 4);
     const halfHeight = node.required ? 14 : 9;
