@@ -22,9 +22,12 @@ function searchQuery(query: string, options: SearchOptions = {}) {
     const tokens = [...new Set(query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])].filter(
         (word) => !STOP_WORDS.has(fold(word)),
     );
-    if (!tokens.length) return null;
-    if (tokens.length > 24)
+    if (!tokens.length) {
+        return null;
+    }
+    if (tokens.length > 24) {
         throw new Error('Search accepts at most 24 distinct terms. Use a more specific query.');
+    }
     const matchQuery = tokens.map((token) => `"${token}"*`).join(' OR ');
     const matches = sql.join(
         tokens.map(
@@ -51,7 +54,9 @@ function searchQuery(query: string, options: SearchOptions = {}) {
 
 export async function searchNeuronIds(db: Db, query: string) {
     const search = searchQuery(query);
-    if (!search) return [];
+    if (!search) {
+        return [];
+    }
     const result = await db.run(sql`${search.coverage}
         SELECT f.id FROM neurons_fts AS f JOIN neurons AS n ON n.id = f.id
         JOIN coverage AS c ON c.neuron_rowid = f.rowid
@@ -66,13 +71,17 @@ export async function searchNeurons(
     limit = 10,
     options: SearchOptions = {},
 ) {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 50)
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
         throw new Error('Search limit must be an integer from 1 to 50');
+    }
     const offset = options.offset ?? 0;
-    if (!Number.isInteger(offset) || offset < 0)
+    if (!Number.isInteger(offset) || offset < 0) {
         throw new Error('Search offset must be a nonnegative integer');
+    }
     const search = searchQuery(query, options);
-    if (!search) return [];
+    if (!search) {
+        return [];
+    }
     const { tokens } = search;
     const result = await db.run(sql`
         ${search.coverage}

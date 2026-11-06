@@ -6,15 +6,18 @@ import { sourceInputSchema } from '#lib/neuron/schema';
 import { atomicWrite, CONTENT_DIR, fingerprint } from './storage';
 
 function sourcePath(id: string) {
-    if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Invalid source ID');
+    if (!/^[a-f0-9]{64}$/.test(id)) {
+        throw new Error('Invalid source ID');
+    }
     return path.join(CONTENT_DIR, 'sources', `${id}.json`);
 }
 
 export async function readSource(id: string) {
     const stored = JSON.parse(await readFile(sourcePath(id), 'utf8'));
     const source = sourceInputSchema.parse(stored.source);
-    if (fingerprint(JSON.stringify(source)) !== id)
+    if (fingerprint(JSON.stringify(source)) !== id) {
         throw new Error(`Source integrity failure: ${id}`);
+    }
     return { id, capturedAt: String(stored.capturedAt), source };
 }
 

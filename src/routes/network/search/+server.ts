@@ -8,7 +8,9 @@ import { searchNeuronIds } from '#lib/server/neuron/search';
 
 export const GET: RequestHandler = async ({ url }) => {
     const query = url.searchParams.get('q')?.trim() ?? '';
-    if (query.length > 2000) error(400, 'Search query is too long.');
+    if (query.length > 2000) {
+        error(400, 'Search query is too long.');
+    }
     await ensureIndex(db);
     try {
         return json(
@@ -18,8 +20,9 @@ export const GET: RequestHandler = async ({ url }) => {
             },
         );
     } catch (cause) {
-        if (cause instanceof Error && cause.message.startsWith('Search accepts at most'))
+        if (cause instanceof Error && cause.message.startsWith('Search accepts at most')) {
             error(400, cause.message);
+        }
         throw cause;
     }
 };

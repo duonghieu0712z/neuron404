@@ -61,7 +61,9 @@ async function optional(file: string) {
     try {
         return await readFile(file, 'utf8');
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return null;
+        }
         throw error;
     }
 }
@@ -78,7 +80,9 @@ function reportPath(region: string, kind: ReviewReport['kind'], id: string) {
 
 async function readAt(region: string, kind: ReviewReport['kind'], id: string) {
     const raw = await optional(reportPath(region, kind, id));
-    if (raw === null) return null;
+    if (raw === null) {
+        return null;
+    }
     const report = reportSchema.parse(JSON.parse(raw));
     const { id: actual, ...content } = report;
     if (
@@ -86,8 +90,9 @@ async function readAt(region: string, kind: ReviewReport['kind'], id: string) {
         report.region !== region ||
         report.kind !== kind ||
         fingerprint(JSON.stringify(content)) !== id
-    )
+    ) {
         throw new Error('Review report integrity failure.');
+    }
     return report;
 }
 
@@ -95,10 +100,14 @@ export async function readLatestReport(region: string, kind: ReviewReport['kind'
     const raw = await optional(
         path.join(directory, 'reports', regionIdSchema.parse(region), kind, 'latest.json'),
     );
-    if (raw === null) return null;
+    if (raw === null) {
+        return null;
+    }
     const { id } = z.object({ id: hashSchema }).parse(JSON.parse(raw));
     const report = await readAt(region, kind, id);
-    if (!report) throw new Error('Review report pointer has no matching report.');
+    if (!report) {
+        throw new Error('Review report pointer has no matching report.');
+    }
     return report;
 }
 
@@ -108,14 +117,20 @@ export async function readReport(id: string) {
     try {
         regions = await readdir(path.join(directory, 'reports'));
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return null;
+        }
         throw error;
     }
     for (const region of regions) {
-        if (!regionIdSchema.safeParse(region).success) continue;
+        if (!regionIdSchema.safeParse(region).success) {
+            continue;
+        }
         for (const kind of ['knowledge', 'overview'] as const) {
             const report = await readAt(region, kind, id);
-            if (report) return report;
+            if (report) {
+                return report;
+            }
         }
     }
     return null;
@@ -151,7 +166,9 @@ export async function saveReportUnlocked(input: Omit<ReviewReport, 'id'>) {
                 evidence: finding.evidence.map((item) => JSON.stringify(item)).sort(),
             });
         for (const finding of previous.findings) {
-            if (decisions[finding.id] || ids.has(finding.id)) continue;
+            if (decisions[finding.id] || ids.has(finding.id)) {
+                continue;
+            }
             const replacement = input.findings.find((item) => identity(item) === identity(finding));
             if (replacement) {
                 replacement.originReport ??= finding.originReport ?? previous.id;
@@ -163,7 +180,9 @@ export async function saveReportUnlocked(input: Omit<ReviewReport, 'id'>) {
                 carriedForward: true,
             });
         }
-        if (input.findings.length) input.verdict = 'needs-review';
+        if (input.findings.length) {
+            input.verdict = 'needs-review';
+        }
     }
     const content = reportSchema.omit({ id: true }).parse(input);
     const id = fingerprint(JSON.stringify(content));
@@ -200,8 +219,9 @@ export async function decideFinding(
     z.string().trim().min(10).max(2000).parse(note);
     return withStorageLock(async () => {
         const report = await readReport(reportId);
-        if (!report?.findings.some((finding) => finding.id === findingId))
+        if (!report?.findings.some((finding) => finding.id === findingId)) {
             throw new Error('Finding not found in the specified report.');
+        }
         const decisions = await readDecisions();
         decisions[findingId] = { status, note, report: reportId, at: new Date().toISOString() };
         await atomicWrite(
@@ -229,9 +249,13 @@ export async function readRegionReviews(
             (['knowledge', 'overview'] as const).map((kind) => readLatestReport(regionId, kind)),
         )
     ).filter((report) => report !== null);
-    if (!reports.length) return [];
+    if (!reports.length) {
+        return [];
+    }
     if (!snapshots) {
-        if (!db) return withIndexedStore((store) => readRegionReviews(regionId, undefined, store));
+        if (!db) {
+            return withIndexedStore((store) => readRegionReviews(regionId, undefined, store));
+        }
         const members = await readIndexSnapshots(db, { region: regionId });
         const context = await readIndexSnapshots(db, {
             ids: [...new Set(reports.flatMap((report) => Object.keys(report.context)))],
@@ -261,31 +285,34 @@ export async function readRegionReviews(
                 .map((item) => item.id),
         ),
     ];
-    const evidenceNeurons = db
-        ? evidenceIds.length
-            ? await db
-                  .select({ id: neurons.id, title: neurons.title, body: neurons.body })
-                  .from(neurons)
-                  .where(inArray(neurons.id, evidenceIds))
-            : []
-        : (
-              await Promise.all(
-                  evidenceIds.map(async (id) => {
-                      try {
-                          return (await readNeuronSnapshot(id)).neuron;
-                      } catch {
-                          return null;
-                      }
-                  }),
-              )
-          ).filter((neuron) => neuron !== null);
-    for (const neuron of evidenceNeurons)
+    let evidenceNeurons: { id: string; title: string; body: string }[] = [];
+    if (db && evidenceIds.length) {
+        evidenceNeurons = await db
+            .select({ id: neurons.id, title: neurons.title, body: neurons.body })
+            .from(neurons)
+            .where(inArray(neurons.id, evidenceIds));
+    } else if (!db) {
+        const snapshots = await Promise.all(
+            evidenceIds.map(async (id) => {
+                try {
+                    return (await readNeuronSnapshot(id)).neuron;
+                } catch {
+                    return null;
+                }
+            }),
+        );
+        evidenceNeurons = snapshots.filter((neuron) => neuron !== null);
+    }
+
+    for (const neuron of evidenceNeurons) {
         evidenceSources.set(`neuron:${neuron.id}`, { title: neuron.title, body: neuron.body });
-    if (region && overviewRaw !== null)
+    }
+    if (region && overviewRaw !== null) {
         evidenceSources.set(`overview:${regionId}`, {
             title: region.title,
             body: matter(overviewRaw, {}).content.trim(),
         });
+    }
     const unavailable = new Set<string>();
     for (const id of new Set(reports.flatMap((report) => report.sources))) {
         try {
@@ -309,11 +336,11 @@ export async function readRegionReviews(
                     {
                         title:
                             source?.title ??
-                            (evidence.kind === 'neuron'
-                                ? 'Unavailable neuron'
-                                : evidence.kind === 'overview'
-                                  ? 'Region overview'
-                                  : 'Unavailable source'),
+                            {
+                                neuron: 'Unavailable neuron',
+                                overview: 'Region overview',
+                                source: 'Unavailable source',
+                            }[evidence.kind],
                         available: source !== undefined,
                         matchesCurrent: offset >= 0,
                         leading: offset > 0,
@@ -345,6 +372,8 @@ export async function readRegionReviews(
 
 export async function listReviewReports() {
     const result = [];
-    for (const region of await readRegions()) result.push(...(await readRegionReviews(region.id)));
+    for (const region of await readRegions()) {
+        result.push(...(await readRegionReviews(region.id)));
+    }
     return result;
 }

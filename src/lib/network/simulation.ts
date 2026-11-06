@@ -17,8 +17,12 @@ function orderRegionMembers<Node extends NetworkNode>(
     for (const link of links) {
         const source = typeof link.source === 'object' ? link.source.id : String(link.source);
         const target = typeof link.target === 'object' ? link.target.id : String(link.target);
-        if (source === target || !neighbors.has(source) || !neighbors.has(target)) continue;
-        if (!neighbors.get(source)!.has(target)) edges.push([source, target]);
+        if (source === target || !neighbors.has(source) || !neighbors.has(target)) {
+            continue;
+        }
+        if (!neighbors.get(source)!.has(target)) {
+            edges.push([source, target]);
+        }
         neighbors.get(source)!.add(target);
         neighbors.get(target)!.add(source);
     }
@@ -30,7 +34,9 @@ function orderRegionMembers<Node extends NetworkNode>(
         const pending = [start];
         while (pending.length) {
             const id = pending.pop()!;
-            if (visited.has(id)) continue;
+            if (visited.has(id)) {
+                continue;
+            }
             visited.add(id);
             order.push(id);
             pending.push(...[...neighbors.get(id)!].sort(byDegree).reverse());
@@ -50,7 +56,9 @@ function orderRegionMembers<Node extends NetworkNode>(
             length += 2 - 2 * Math.cos(((b - a) * Math.PI * 2) / order.length);
             for (let j = i + 1; j < spans.length; j++) {
                 const [c, d] = spans[j];
-                if ((a < c && c < b && b < d) || (c < a && a < d && d < b)) crossings++;
+                if ((a < c && c < b && b < d) || (c < a && a < d && d < b)) {
+                    crossings++;
+                }
             }
         }
         return crossings * (edges.length * 4 + 1) + length;
@@ -72,7 +80,9 @@ function orderRegionMembers<Node extends NetworkNode>(
                 }
             }
         }
-        if (!improved) break;
+        if (!improved) {
+            break;
+        }
     }
     const byId = new Map(members.map((node) => [node.id, node]));
     return order.map((id) => byId.get(id)!);
@@ -222,7 +232,9 @@ export function createNetworkSimulation<Node extends NetworkNode>(
             }
             for (const [id, center] of regionNodes) {
                 const members = nodes.filter((node) => regionSlots.get(id)?.has(node.id));
-                if (!members.length) continue;
+                if (!members.length) {
+                    continue;
+                }
                 const centroid = members.reduce(
                     (sum, node) => ({
                         x: sum.x + (node.x ?? 0) / members.length,
@@ -242,11 +254,15 @@ export function createNetworkSimulation<Node extends NetworkNode>(
                 for (const link of links) {
                     const source = link.source as Node;
                     const target = link.target as Node;
-                    if (source === center || target === center) continue;
+                    if (source === center || target === center) {
+                        continue;
+                    }
                     const dx = (target.x ?? 0) - (source.x ?? 0);
                     const dy = (target.y ?? 0) - (source.y ?? 0);
                     const lengthSquared = dx * dx + dy * dy;
-                    if (lengthSquared < 1) continue;
+                    if (lengthSquared < 1) {
+                        continue;
+                    }
                     const projection = Math.max(
                         0,
                         Math.min(
@@ -260,14 +276,18 @@ export function createNetworkSimulation<Node extends NetworkNode>(
                     const offsetY = (source.y ?? 0) + dy * projection - (center.y ?? 0);
                     const distance = Math.hypot(offsetX, offsetY);
                     const clearance = 80;
-                    if (distance >= clearance) continue;
+                    if (distance >= clearance) {
+                        continue;
+                    }
                     const length = Math.sqrt(lengthSquared);
                     const normalX = distance > 0.01 ? offsetX / distance : -dy / length;
                     const normalY = distance > 0.01 ? offsetY / distance : dx / length;
                     const sourceWeight = source.fx == null ? 1 - projection : 0;
                     const targetWeight = target.fx == null ? projection : 0;
                     const weight = sourceWeight ** 2 + targetWeight ** 2;
-                    if (!weight) continue;
+                    if (!weight) {
+                        continue;
+                    }
                     const push = ((clearance - distance) * alpha * 1.2) / weight;
                     source.vx = (source.vx ?? 0) + normalX * push * sourceWeight;
                     source.vy = (source.vy ?? 0) + normalY * push * sourceWeight;
@@ -284,7 +304,9 @@ export function createNetworkSimulation<Node extends NetworkNode>(
                 for (let j = i + 1; j < regionIds.length; j++) {
                     const bId = regionIds[j];
                     const bMembers = membersByRegion.get(bId)!;
-                    if (aMembers.some((node) => regionSlots.get(bId)?.has(node.id))) continue;
+                    if (aMembers.some((node) => regionSlots.get(bId)?.has(node.id))) {
+                        continue;
+                    }
                     const b = regionNodes.get(bId) ?? anchors.get(bId)!;
                     const extent = (center: { x?: number; y?: number }, members: Node[]) =>
                         Math.max(
@@ -300,7 +322,9 @@ export function createNetworkSimulation<Node extends NetworkNode>(
                     const dy = (b.y ?? 0) - (a.y ?? 0);
                     const distance = Math.hypot(dx, dy);
                     const minimum = extent(a, aMembers) + extent(b, bMembers) + 300;
-                    if (distance >= minimum) continue;
+                    if (distance >= minimum) {
+                        continue;
+                    }
                     const nx = distance > 0.01 ? dx / distance : 1;
                     const ny = distance > 0.01 ? dy / distance : 0;
                     const shift = (minimum - distance) * 0.3 * alpha;
@@ -309,7 +333,9 @@ export function createNetworkSimulation<Node extends NetworkNode>(
                         [bId, bMembers, 1],
                     ] as const) {
                         const center = regionNodes.get(id);
-                        if (center?.fx != null || center?.fy != null) continue;
+                        if (center?.fx != null || center?.fy != null) {
+                            continue;
+                        }
                         const target = center ? targets.get(center.id)! : anchors.get(id)!;
                         target.x += nx * shift * direction;
                         target.y += ny * shift * direction;
@@ -324,7 +350,9 @@ export function createNetworkSimulation<Node extends NetworkNode>(
         .velocityDecay(0.45)
         .stop();
 
-    if (settle) simulation.tick(400);
+    if (settle) {
+        simulation.tick(400);
+    }
 
     return simulation.alpha(0);
 }

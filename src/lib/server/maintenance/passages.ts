@@ -26,11 +26,15 @@ export function evidencePassages(text: string): string[] {
                     const boundary = Math.max(prefix.lastIndexOf(' '), prefix.lastIndexOf('\t'));
                     let end = boundary > TARGET_LENGTH / 2 ? boundary + 1 : MAX_LENGTH;
                     // Avoid cutting a UTF-16 surrogate pair in an unusually long token.
-                    if (/[\uD800-\uDBFF]/.test(remaining[end - 1])) end--;
+                    if (/[\uD800-\uDBFF]/.test(remaining[end - 1])) {
+                        end--;
+                    }
                     segments.push(remaining.slice(0, end));
                     remaining = remaining.slice(end);
                 }
-                if (remaining) segments.push(remaining);
+                if (remaining) {
+                    segments.push(remaining);
+                }
             }
         }
     }
@@ -43,7 +47,9 @@ export function evidencePassages(text: string): string[] {
         }
         pending += segment;
     }
-    if (pending) result.push(pending);
+    if (pending) {
+        result.push(pending);
+    }
     // Whitespace-only gaps need no independent reference, but remain in adjacent passages.
     return result.filter((passage) => passage.trim());
 }

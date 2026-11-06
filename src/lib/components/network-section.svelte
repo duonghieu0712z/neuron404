@@ -31,6 +31,14 @@
         summary?: Snippet;
         children: Snippet;
     } = $props();
+    const toggleLabel = $derived(`${open ? 'Collapse' : 'Expand'} ${title}`);
+
+    const chevronRotation = $derived.by(() => {
+        if (vertical) {
+            return open ? 'rotate-90' : '-rotate-90';
+        }
+        return open ? 'rotate-90' : '';
+    });
 </script>
 
 <Collapsible bind:open class={className}>
@@ -45,8 +53,8 @@
                         'bg-transparent!',
                         iconOnly ? 'shrink-0' : 'h-7 w-full justify-start gap-2 px-2 text-xs',
                     ]}
-                    aria-label={iconOnly ? `${open ? 'Collapse' : 'Expand'} ${title}` : undefined}
-                    title={iconOnly ? `${open ? 'Collapse' : 'Expand'} ${title}` : undefined}
+                    aria-label={iconOnly ? toggleLabel : undefined}
+                    title={iconOnly ? toggleLabel : undefined}
                 >
                     {#if !iconOnly}
                         <span>{title}</span>
@@ -60,7 +68,7 @@
                         class={[
                             iconOnly ? 'size-4' : 'ml-auto size-3 text-muted-foreground',
                             'transition-transform',
-                            vertical ? (open ? 'rotate-90' : '-rotate-90') : open && 'rotate-90',
+                            chevronRotation,
                         ]}
                     />
                 </Button>

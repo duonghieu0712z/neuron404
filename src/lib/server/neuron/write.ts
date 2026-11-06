@@ -19,26 +19,40 @@ export async function validateNeuronReferences(neuron: Neuron) {
     const regions = new Set((await readRegions()).map((region) => region.id));
     const existing = new Map((await readAllNeurons()).map((item) => [item.id, item]));
     existing.set(neuron.id, neuron);
-    for (const id of neuron.regions) if (!regions.has(id)) throw new Error(`Unknown region: ${id}`);
-    for (const edge of neuron.synapses)
-        if (!existing.has(edge.target)) throw new Error(`Unknown synapse target: ${edge.target}`);
+    for (const id of neuron.regions) {
+        if (!regions.has(id)) {
+            throw new Error(`Unknown region: ${id}`);
+        }
+    }
+    for (const edge of neuron.synapses) {
+        if (!existing.has(edge.target)) {
+            throw new Error(`Unknown synapse target: ${edge.target}`);
+        }
+    }
     await Promise.all(neuron.sources.map(readSource));
-    if ((neuron.lifecycle === 'superseded') !== Boolean(neuron.supersededBy))
+    if ((neuron.lifecycle === 'superseded') !== Boolean(neuron.supersededBy)) {
         throw new Error('A superseded neuron must name its replacement; other states must not.');
+    }
     const visited = new Set([neuron.id]);
     let replacement = neuron.supersededBy;
     while (replacement) {
-        if (visited.has(replacement)) throw new Error('Supersession cycle');
+        if (visited.has(replacement)) {
+            throw new Error('Supersession cycle');
+        }
         visited.add(replacement);
         const target = existing.get(replacement);
-        if (!target) throw new Error(`Unknown replacement: ${replacement}`);
+        if (!target) {
+            throw new Error(`Unknown replacement: ${replacement}`);
+        }
         replacement = target.supersededBy;
     }
 }
 
 export async function commitNeuron(db: Db, neuron: Neuron, previousRaw?: string) {
     await validateNeuronReferences(neuron);
-    if (previousRaw !== undefined) await archiveNeuron(neuron.id, previousRaw);
+    if (previousRaw !== undefined) {
+        await archiveNeuron(neuron.id, previousRaw);
+    }
     await markIndexDirty();
     const { body, ...frontmatter } = neuron;
     await writeNeuron(neuronFrontmatterSchema.parse(frontmatter), body);

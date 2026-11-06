@@ -25,12 +25,15 @@ export async function updateNeuron(db: Db, id: string, input: UpdateNeuronInput)
     const { expectedRevision, ...changes } = updateNeuronInputSchema.parse(input);
     return withStorageLock(async () => {
         const current = await readNeuronSnapshot(id);
-        if (current.revision !== expectedRevision)
+        if (current.revision !== expectedRevision) {
             throw new Error(
                 'Revision conflict. Read the current neuron and merge your changes before retrying.',
             );
+        }
         const combined = { ...current.neuron, ...changes, updated: new Date().toISOString() };
-        if (combined.supersededBy === null) delete combined.supersededBy;
+        if (combined.supersededBy === null) {
+            delete combined.supersededBy;
+        }
         const frontmatter = neuronFrontmatterSchema.parse(combined);
         return commitNeuron(
             db,

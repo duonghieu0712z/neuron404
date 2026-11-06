@@ -32,11 +32,13 @@ export async function generateStructured<T>(
     signal?: AbortSignal,
 ) {
     const adapter = config.provider ? maintenanceAgents.get(config.provider) : undefined;
-    if (!adapter)
+    if (!adapter) {
         throw new Error('Maintenance is disabled. Configure a registered provider explicitly.');
+    }
     signal?.throwIfAborted();
-    if (Buffer.byteLength(input) > config.maxInputBytes)
+    if (Buffer.byteLength(input) > config.maxInputBytes) {
         throw new Error('Region input exceeds the configured size limit.');
+    }
     const directory = await mkdtemp(path.join(tmpdir(), 'neuron404-maintenance-'));
     try {
         const invocation = await adapter.prepare({
@@ -58,16 +60,25 @@ export async function generateStructured<T>(
             let failure: Error | undefined;
             let killTimer: ReturnType<typeof setTimeout> | undefined;
             function kill(force = false) {
-                if (!child.pid) return;
+                if (!child.pid) {
+                    return;
+                }
                 try {
-                    if (process.platform === 'win32') child.kill(force ? 'SIGKILL' : 'SIGTERM');
-                    else process.kill(-child.pid, force ? 'SIGKILL' : 'SIGTERM');
+                    if (process.platform === 'win32') {
+                        child.kill(force ? 'SIGKILL' : 'SIGTERM');
+                    } else {
+                        process.kill(-child.pid, force ? 'SIGKILL' : 'SIGTERM');
+                    }
                 } catch (error) {
-                    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+                    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
+                        throw error;
+                    }
                 }
             }
             function stop(error: Error) {
-                if (failure) return;
+                if (failure) {
+                    return;
+                }
                 failure = error;
                 kill();
                 killTimer = setTimeout(() => kill(true), 5000);
@@ -85,9 +96,11 @@ export async function generateStructured<T>(
             }
             child.stdout.on('data', (chunk: Buffer) => {
                 size += chunk.length;
-                if (size > 1_000_000)
+                if (size > 1_000_000) {
                     stop(new Error(`${adapter.id} CLI output exceeded the size limit.`));
-                else chunks.push(chunk);
+                } else {
+                    chunks.push(chunk);
+                }
             });
             child.stderr.resume();
             child.stdin.on('error', () => {});
@@ -101,17 +114,23 @@ export async function generateStructured<T>(
             });
             child.on('close', (code) => {
                 cleanup();
-                if (failure) reject(failure);
-                else if (code !== 0)
+                if (failure) {
+                    reject(failure);
+                } else if (code !== 0) {
                     reject(
                         new Error(
                             `${adapter.id} CLI exited with code ${code}. Check its login and configuration.`,
                         ),
                     );
-                else resolve(Buffer.concat(chunks).toString('utf8'));
+                } else {
+                    resolve(Buffer.concat(chunks).toString('utf8'));
+                }
             });
-            if (signal?.aborted) abort();
-            else child.stdin.end(invocation.input);
+            if (signal?.aborted) {
+                abort();
+            } else {
+                child.stdin.end(invocation.input);
+            }
         });
         return schema.parse(await invocation.readOutput(output));
     } finally {
@@ -125,7 +144,8 @@ export async function generateOverview(
     signal?: AbortSignal,
 ) {
     const { body } = await generateStructured(input, config, outputSchema, instructions, signal);
-    if (body.startsWith('---') || body.startsWith('```') || !/^#{1,3}\s/m.test(body))
+    if (body.startsWith('---') || body.startsWith('```') || !/^#{1,3}\s/m.test(body)) {
         throw new Error('Overview must contain Markdown headings without a wrapper.');
+    }
     return body;
 }

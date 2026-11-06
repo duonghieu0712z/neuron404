@@ -20,7 +20,9 @@
     } = $props();
 
     function handleSynapseClick(event: MouseEvent, id: string) {
-        if (!onSelectNeuron) return;
+        if (!onSelectNeuron) {
+            return;
+        }
         event.preventDefault();
         onSelectNeuron(id);
     }

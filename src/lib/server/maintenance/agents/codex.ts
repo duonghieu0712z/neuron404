@@ -63,8 +63,9 @@ export const codexAgent: MaintenanceAgentAdapter = {
             input,
             async readOutput() {
                 const output = await readFile(outputPath, 'utf8');
-                if (Buffer.byteLength(output) > 1_000_000)
+                if (Buffer.byteLength(output) > 1_000_000) {
                     throw new Error('Codex output exceeded the size limit.');
+                }
                 return JSON.parse(output) as unknown;
             },
         };

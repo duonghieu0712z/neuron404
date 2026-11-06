@@ -24,7 +24,9 @@ export function buildNetworkModel(neurons: Neuron[], regions: Region[]) {
     const regionIds = new Set(regions.map((region) => region.id));
     for (const node of nodes) {
         for (const id of node.regions) {
-            if (!regionIds.has(id)) throw new Error(`Unknown region "${id}" on neuron ${node.id}`);
+            if (!regionIds.has(id)) {
+                throw new Error(`Unknown region "${id}" on neuron ${node.id}`);
+            }
         }
     }
     const edges: NetworkEdgeData[] = neurons.flatMap((neuron) =>
@@ -41,13 +43,14 @@ export function buildNetworkModel(neurons: Neuron[], regions: Region[]) {
         }))
         .filter((region) => region.nodeIds.length > 0);
     const unfiled = nodes.filter((node) => node.regions.length === 0).map((node) => node.id);
-    if (unfiled.length)
+    if (unfiled.length) {
         populatedRegions.push({
             id: 'region:unfiled',
             title: 'Unfiled',
             description: 'Neurons without a region.',
             nodeIds: unfiled,
         });
+    }
     return {
         nodes,
         edges,

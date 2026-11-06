@@ -18,7 +18,9 @@ export function getVisibleMembershipLinks(
     active: string | null,
     selected: string | null,
 ) {
-    if (mode === 'hidden') return [];
+    if (mode === 'hidden') {
+        return [];
+    }
     return regions.flatMap((region) => {
         const center = getRegionNodeId(region.id);
         const activeRegion = active === center;

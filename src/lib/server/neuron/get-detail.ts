@@ -17,11 +17,15 @@ export async function getNeuronDetail(id: string) {
     return withStorageLock(async () => {
         await synchronizeIndexUnlocked(db, false, INDEX_RECHECK_MS);
         let neuron = await db.query.neurons.findFirst({ where: eq(neurons.id, id) });
-        if (!neuron) throw error(404, 'Neuron not found');
+        if (!neuron) {
+            throw error(404, 'Neuron not found');
+        }
         const snapshot = await readIndexedNeuron(db, id);
         if (snapshot.revision !== neuron.revision) {
             neuron = await db.query.neurons.findFirst({ where: eq(neurons.id, id) });
-            if (!neuron) throw error(404, 'Neuron not found');
+            if (!neuron) {
+                throw error(404, 'Neuron not found');
+            }
         }
         const source = snapshot.neuron;
 

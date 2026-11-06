@@ -27,6 +27,7 @@ for (const result of results) {
     console.log(`${result.id}  ${result.title}`);
     console.log(`  ${result.snippet}`);
     console.log(`  revision: ${result.revision}; lifecycle: ${result.lifecycle}`);
-    for (const caution of result.cautions)
+    for (const caution of result.cautions) {
         console.log(`  ${caution.kind}: ${caution.id} ${caution.title}`);
+    }
 }

@@ -45,7 +45,9 @@ async function readRaw(id: string) {
     try {
         return await readFile(overviewPath(id), 'utf8');
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return null;
+        }
         throw error;
     }
 }
@@ -68,9 +70,13 @@ export async function readRegionOverview(
 ): Promise<RegionOverview> {
     regionIdSchema.parse(id);
     const region = (await readRegions()).find((item) => item.id === id);
-    if (!region) throw new Error(`Unknown region: ${id}`);
+    if (!region) {
+        throw new Error(`Unknown region: ${id}`);
+    }
     if (!snapshots) {
-        if (!db) return withIndexedStore((store) => readRegionOverview(id, undefined, store));
+        if (!db) {
+            return withIndexedStore((store) => readRegionOverview(id, undefined, store));
+        }
         snapshots = await readIndexSnapshots(db, { region: id });
     }
     const members = snapshots.filter(({ neuron }) => neuron.regions.includes(id));
@@ -80,7 +86,9 @@ export async function readRegionOverview(
     const raw = await readRaw(id);
     const parsed = raw === null ? null : matter(raw, {});
     const metadata = parsed ? metadataSchema.parse(parsed.data) : null;
-    if (metadata && metadata.region !== id) throw new Error('Region overview ID mismatch');
+    if (metadata && metadata.region !== id) {
+        throw new Error('Region overview ID mismatch');
+    }
     return {
         region,
         body: parsed?.content.trim() ?? '',
@@ -97,12 +105,16 @@ export async function readRegionSummary(id: string) {
     regionIdSchema.parse(id);
     return withIndexedStore(async (db) => {
         const region = (await readRegions()).find((item) => item.id === id);
-        if (!region) throw new Error(`Unknown region: ${id}`);
+        if (!region) {
+            throw new Error(`Unknown region: ${id}`);
+        }
         const members = await readIndexSnapshots(db, { region: id });
         const raw = await readRaw(id);
         const parsed = raw === null ? null : matter(raw, {});
         const metadata = parsed ? metadataSchema.parse(parsed.data) : null;
-        if (metadata && metadata.region !== id) throw new Error('Region overview ID mismatch');
+        if (metadata && metadata.region !== id) {
+            throw new Error('Region overview ID mismatch');
+        }
         return {
             region,
             body: parsed?.content.trim() ?? '',
@@ -134,24 +146,30 @@ export async function writeRegionOverviewUnlocked(id: string, payload: unknown) 
 async function writeIndexedOverview(db: Db, id: string, payload: unknown) {
     const input = inputSchema.parse(payload);
     const current = await readRegionOverview(id, undefined, db);
-    if (current.revision !== input.expectedRevision)
+    if (current.revision !== input.expectedRevision) {
         throw new Error('Region overview revision conflict. Read region:read before retrying.');
-    if (!sameMembers(current.memberRevisions, input.memberRevisions))
+    }
+    if (!sameMembers(current.memberRevisions, input.memberRevisions)) {
         throw new Error(
             'Region members changed. Read the affected neurons and refresh the overview.',
         );
+    }
     const citations = [...input.body.matchAll(/\]\(neuron:([a-zA-Z0-9_-]+)\)/g)];
-    if (current.neurons.length && !citations.length)
+    if (current.neurons.length && !citations.length) {
         throw new Error(
             'A Region overview must cite supporting neurons with Markdown neuron: links.',
         );
-    for (const match of citations)
-        if (!Object.hasOwn(current.memberRevisions, match[1]))
+    }
+    for (const match of citations) {
+        if (!Object.hasOwn(current.memberRevisions, match[1])) {
             throw new Error(`Overview citation is not a member of this Region: ${match[1]}`);
+        }
+    }
     const previous = await readRaw(id);
     const history = path.join(CONTENT_DIR, 'history', 'region-overviews', id);
-    if (previous !== null)
+    if (previous !== null) {
         await atomicWrite(path.join(history, `${fingerprint(previous)}.md`), previous, true);
+    }
     const raw = matter.stringify(`${input.body}\n`, {
         region: id,
         updated: new Date().toISOString(),

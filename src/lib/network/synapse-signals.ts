@@ -26,12 +26,16 @@ export function getSynapsePulse(
     const start = sourceRadius + 4;
     const end = targetRadius + 4;
     const length = distance - start - end;
-    if (length <= 2) return null;
+    if (length <= 2) {
+        return null;
+    }
     // Keep the phase stable while nodes move or the camera zooms.
     const travel = 1600;
     const cycle = travel + 350;
     const phase = ((Math.max(0, elapsed) + offset * cycle) % cycle) / travel;
-    if (phase >= 1) return null;
+    if (phase >= 1) {
+        return null;
+    }
     const headDistance = start + length * phase;
     const tailDistance = Math.max(start, headDistance - 18);
     const point = (position: number) => ({
@@ -47,7 +51,9 @@ export function getSynapsePulse(
 
 function phaseOffset(id: string) {
     let hash = 2166136261;
-    for (const character of id) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+    for (const character of id) {
+        hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+    }
     return (hash >>> 0) / 4294967296;
 }
 
@@ -78,7 +84,9 @@ export function createSynapseSignals(
         !disposed && !!context && enabled && !document.hidden && links.length > 0;
 
     const clear = () => {
-        if (!context) return;
+        if (!context) {
+            return;
+        }
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, canvas.width, canvas.height);
     };
@@ -91,10 +99,18 @@ export function createSynapseSignals(
         const ratio = window.devicePixelRatio || 1;
         const bufferWidth = Math.round(width * ratio);
         const bufferHeight = Math.round(height * ratio);
-        if (canvas.width !== bufferWidth) canvas.width = bufferWidth;
-        if (canvas.height !== bufferHeight) canvas.height = bufferHeight;
-        if (canvas.style.width !== `${width}px`) canvas.style.width = `${width}px`;
-        if (canvas.style.height !== `${height}px`) canvas.style.height = `${height}px`;
+        if (canvas.width !== bufferWidth) {
+            canvas.width = bufferWidth;
+        }
+        if (canvas.height !== bufferHeight) {
+            canvas.height = bufferHeight;
+        }
+        if (canvas.style.width !== `${width}px`) {
+            canvas.style.width = `${width}px`;
+        }
+        if (canvas.style.height !== `${height}px`) {
+            canvas.style.height = `${height}px`;
+        }
         context.setTransform(ratio, 0, 0, ratio, 0, 0);
         context.clearRect(0, 0, width, height);
         context.lineCap = 'round';
@@ -104,8 +120,9 @@ export function createSynapseSignals(
                 !graph.hasNode(link.target) ||
                 renderer.getNodeState(link.source).isHidden ||
                 renderer.getNodeState(link.target).isHidden
-            )
+            ) {
                 continue;
+            }
             const source = graph.getNodeAttributes(link.source);
             const target = graph.getNodeAttributes(link.target);
             const pulse = getSynapsePulse(
@@ -116,7 +133,9 @@ export function createSynapseSignals(
                 time - startedAt,
                 link.offset,
             );
-            if (!pulse || pulse.opacity <= 0) continue;
+            if (!pulse || pulse.opacity <= 0) {
+                continue;
+            }
             context.globalAlpha = pulse.opacity;
             const trail = context.createLinearGradient(
                 pulse.tail.x,
@@ -145,15 +164,18 @@ export function createSynapseSignals(
         context.save();
         context.globalCompositeOperation = 'destination-out';
         for (const id of graph.nodes()) {
-            if (renderer.getNodeState(id).isHidden) continue;
+            if (renderer.getNodeState(id).isHidden) {
+                continue;
+            }
             const node = graph.getNodeAttributes(id);
             const point = renderer.graphToViewport({ x: node.x, y: node.y });
             context.beginPath();
             context.arc(point.x, point.y, renderer.scaleSize(node.size) + 2, 0, Math.PI * 2);
             context.fill();
         }
-        for (const mask of getLabelMasks())
+        for (const mask of getLabelMasks()) {
             context.clearRect(mask.left, mask.top, mask.right - mask.left, mask.bottom - mask.top);
+        }
         context.restore();
     };
     const animate = (time: number) => {
@@ -167,9 +189,13 @@ export function createSynapseSignals(
     };
     const update = () => {
         if (canAnimate()) {
-            if (frame === null) frame = requestAnimationFrame(animate);
+            if (frame === null) {
+                frame = requestAnimationFrame(animate);
+            }
         } else {
-            if (frame !== null) cancelAnimationFrame(frame);
+            if (frame !== null) {
+                cancelAnimationFrame(frame);
+            }
             frame = null;
             clear();
         }

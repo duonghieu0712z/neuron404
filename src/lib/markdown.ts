@@ -15,8 +15,9 @@ export function renderMarkdownBlocks(
             first &&
             !first[2].trim() &&
             content.slice(0, first.index).trim()
-        )
+        ) {
             content = `${first[1]}\n${content}`;
+        }
     }
     return Lexer.lex(content, { gfm: true })
         .filter((token) => token.type !== 'space')

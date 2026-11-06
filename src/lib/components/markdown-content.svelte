@@ -27,15 +27,18 @@
                 event.ctrlKey ||
                 event.shiftKey ||
                 event.altKey
-            )
+            ) {
                 return;
+            }
             const target = event.target;
             const link =
                 target instanceof Element
                     ? target.closest<HTMLAnchorElement>('a[data-neuron-id]')
                     : null;
             const id = link?.dataset.neuronId;
-            if (!id || !node.contains(link)) return;
+            if (!id || !node.contains(link)) {
+                return;
+            }
             event.preventDefault();
             onSelectNeuron(id);
         };

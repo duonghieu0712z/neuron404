@@ -14,9 +14,12 @@ import {
 const args = process.argv.slice(2);
 function option(name: string) {
     const index = args.indexOf(name);
-    if (index < 0) return undefined;
-    if (!args[index + 1] || args[index + 1].startsWith('--'))
+    if (index < 0) {
+        return undefined;
+    }
+    if (!args[index + 1] || args[index + 1].startsWith('--')) {
         throw new Error(`Missing value for ${name}`);
+    }
     return args[index + 1];
 }
 const controller = new AbortController();
@@ -44,16 +47,19 @@ try {
                 '--audit',
                 '--overview',
             ].includes(argument)
-        )
+        ) {
             throw new Error(`Unknown argument: ${argument}`);
+        }
     }
     if (args.includes('--resolve') || args.includes('--dismiss')) {
-        if (args.includes('--resolve') && args.includes('--dismiss'))
+        if (args.includes('--resolve') && args.includes('--dismiss')) {
             throw new Error('Choose resolve or dismiss, not both.');
+        }
         const report = option('--report');
         const note = option('--note');
-        if (!report || !note)
+        if (!report || !note) {
             throw new Error('Finding decisions require --report ID and --note TEXT.');
+        }
         console.log(
             JSON.stringify(
                 await decideFinding(
@@ -68,7 +74,9 @@ try {
         );
     } else if (args.includes('--report')) {
         const report = await readReport(option('--report')!);
-        if (!report) throw new Error('Review report not found.');
+        if (!report) {
+            throw new Error('Review report not found.');
+        }
         console.log(JSON.stringify(report, null, 2));
     } else if (args.includes('--reports')) {
         console.log(
@@ -108,16 +116,22 @@ try {
         if (!config.provider) {
             log({ status: 'disabled', reason: 'No maintenance provider configured.' });
         } else {
-            if (args.includes('--audit') && args.includes('--overview'))
+            if (args.includes('--audit') && args.includes('--overview')) {
                 throw new Error('Choose audit or overview, not both.');
-            const mode = args.includes('--audit')
-                ? 'knowledge'
-                : args.includes('--overview')
-                  ? 'overview'
-                  : 'all';
+            }
+            let mode: 'knowledge' | 'overview' | 'all' = 'all';
+            if (args.includes('--audit')) {
+                mode = 'knowledge';
+            } else if (args.includes('--overview')) {
+                mode = 'overview';
+            }
             const once = args.includes('--once');
-            if (once) config.settleMs = 0;
-            if (args.includes('--retry-failed')) log(await retryFailedMaintenance());
+            if (once) {
+                config.settleMs = 0;
+            }
+            if (args.includes('--retry-failed')) {
+                log(await retryFailedMaintenance());
+            }
             log({
                 status: 'started',
                 provider: config.provider,
@@ -133,17 +147,27 @@ try {
                         undefined,
                         mode,
                     );
-                    if (result.status !== 'idle' || once) log(result);
-                    if (once && result.status === 'failed') process.exitCode = 1;
+                    if (result.status !== 'idle' || once) {
+                        log(result);
+                    }
+                    if (once && result.status === 'failed') {
+                        process.exitCode = 1;
+                    }
                 } catch (error) {
-                    if (controller.signal.aborted) break;
+                    if (controller.signal.aborted) {
+                        break;
+                    }
                     log({
                         status: 'error',
                         error: error instanceof Error ? error.message : String(error),
                     });
-                    if (once) process.exitCode = 1;
+                    if (once) {
+                        process.exitCode = 1;
+                    }
                 }
-                if (once || controller.signal.aborted) break;
+                if (once || controller.signal.aborted) {
+                    break;
+                }
                 await setTimeout(config.pollMs, undefined, { signal: controller.signal });
             } while (!controller.signal.aborted);
         }

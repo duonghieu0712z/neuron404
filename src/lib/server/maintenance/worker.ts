@@ -65,7 +65,9 @@ export async function readMaintenanceState(): Promise<State> {
         );
         return state;
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            throw error;
+        }
         return { version: 1, windowStartedAt: Date.now(), requests: 0, jobs: {} };
     }
 }
@@ -76,7 +78,9 @@ async function withState<T>(action: (state: State) => Promise<T>) {
         const before = JSON.stringify(state);
         const result = await action(state);
         const after = JSON.stringify(state);
-        if (before !== after) await atomicWrite(statePath, `${after}\n`);
+        if (before !== after) {
+            await atomicWrite(statePath, `${after}\n`);
+        }
         return result;
     });
 }
@@ -85,7 +89,9 @@ export async function retryFailedMaintenance() {
     return withState(async (state) => {
         let reset = 0;
         for (const job of Object.values(state.jobs)) {
-            if (!['failed', 'blocked'].includes(job.status)) continue;
+            if (!['failed', 'blocked'].includes(job.status)) {
+                continue;
+            }
             job.status = 'pending';
             job.attempts = 0;
             job.nextAttemptAt = 0;
@@ -146,13 +152,19 @@ async function claimWork(config: MaintenanceConfig, mode: MaintenanceMode) {
         const valid = new Set(
             regions.flatMap((region) => [`overview:${region.id}`, `knowledge:${region.id}`]),
         );
-        for (const key of Object.keys(state.jobs)) if (!valid.has(key)) delete state.jobs[key];
+        for (const key of Object.keys(state.jobs)) {
+            if (!valid.has(key)) {
+                delete state.jobs[key];
+            }
+        }
         const candidates: Task[] = [];
         for (const region of regions) {
             const overview = await readRegionOverview(region.id, all);
             const members = all.filter(({ neuron }) => neuron.regions.includes(region.id));
             for (const kind of ['overview', 'knowledge'] as const) {
-                if (mode !== 'all' && mode !== kind) continue;
+                if (mode !== 'all' && mode !== kind) {
+                    continue;
+                }
                 const key = `${kind}:${region.id}`;
                 const refresh = overview.revision === null || overview.stale;
                 const bundle =
@@ -167,8 +179,9 @@ async function claimWork(config: MaintenanceConfig, mode: MaintenanceMode) {
                     latest?.candidateHash === fingerprint(overview.body) &&
                     latest.regionRevision === revisions.regionRevision &&
                     JSON.stringify(latest.members) === JSON.stringify(revisions.members)
-                )
+                ) {
                     continue;
+                }
                 const revision = fingerprint(
                     JSON.stringify({
                         kind,
@@ -185,7 +198,7 @@ async function claimWork(config: MaintenanceConfig, mode: MaintenanceMode) {
                         promptVersion: kind === 'overview' ? 4 : 3,
                     }),
                 );
-                if (state.jobs[key]?.fingerprint !== revision)
+                if (state.jobs[key]?.fingerprint !== revision) {
                     state.jobs[key] = {
                         kind,
                         region: region.id,
@@ -196,6 +209,7 @@ async function claimWork(config: MaintenanceConfig, mode: MaintenanceMode) {
                         status: latest?.inputRevision === revision ? 'succeeded' : 'pending',
                         report: latest?.inputRevision === revision ? latest.id : undefined,
                     };
+                }
                 const job = state.jobs[key];
                 if (job.status === 'running' && (job.leaseUntil ?? 0) <= now) {
                     job.status = job.attempts >= config.maxAttempts ? 'failed' : 'pending';
@@ -207,8 +221,9 @@ async function claimWork(config: MaintenanceConfig, mode: MaintenanceMode) {
                     job.status !== 'pending' ||
                     job.nextAttemptAt > now ||
                     now < job.observedAt + config.settleMs
-                )
+                ) {
                     continue;
+                }
                 if (job.attempts >= config.maxAttempts) {
                     job.status = 'failed';
                     continue;
@@ -259,7 +274,9 @@ async function claimWork(config: MaintenanceConfig, mode: MaintenanceMode) {
         const task = candidates.find(
             (candidate) => state.requests + candidate.requests <= config.maxRequestsPerHour,
         );
-        if (!task) return null;
+        if (!task) {
+            return null;
+        }
         const job = state.jobs[task.key];
         job.status = 'running';
         job.attempts++;
@@ -283,16 +300,21 @@ export async function runMaintenancePass(
     models = maintenanceModels,
     mode: MaintenanceMode = 'all',
 ) {
-    if (!config.provider) return { status: 'disabled' as const };
+    if (!config.provider) {
+        return { status: 'disabled' as const };
+    }
     signal?.throwIfAborted();
     const task = await claimWork(config, mode);
-    if (!task) return { status: 'idle' as const };
+    if (!task) {
+        return { status: 'idle' as const };
+    }
     try {
         signal?.throwIfAborted();
         let body: string | undefined;
         let output: ReviewOutput;
-        if (task.kind === 'knowledge') output = await models.audit(task.bundle, config, signal);
-        else {
+        if (task.kind === 'knowledge') {
+            output = await models.audit(task.bundle, config, signal);
+        } else {
             body = task.refresh
                 ? await models.generate(task.input, config, signal)
                 : task.overview.body;
@@ -308,10 +330,13 @@ export async function runMaintenancePass(
                 job.owner !== task.owner ||
                 job.fingerprint !== task.fingerprint ||
                 (job.leaseUntil ?? 0) <= Date.now()
-            )
+            ) {
                 return { status: 'discarded' as const, region: task.region };
+            }
             const currentRegion = (await readRegions()).find((region) => region.id === task.region);
-            if (!currentRegion) throw new Error('Region was removed during review.');
+            if (!currentRegion) {
+                throw new Error('Region was removed during review.');
+            }
             const all = await snapshots();
             const current =
                 task.kind === 'knowledge'
@@ -365,13 +390,15 @@ export async function runMaintenancePass(
             delete job.owner;
             delete job.leaseUntil;
             delete job.error;
+            let status: 'reviewed' | 'updated' | 'verified' = 'verified';
+            if (task.kind === 'knowledge') {
+                status = 'reviewed';
+            } else if (task.refresh) {
+                status = 'updated';
+            }
+
             return {
-                status:
-                    task.kind === 'knowledge'
-                        ? ('reviewed' as const)
-                        : task.refresh
-                          ? ('updated' as const)
-                          : ('verified' as const),
+                status,
                 region: task.region,
                 report: report.id,
                 verdict: report.verdict,
@@ -383,7 +410,9 @@ export async function runMaintenancePass(
         const message = error instanceof Error ? error.message : 'Maintenance failed.';
         await withState(async (state) => {
             const job = state.jobs[task.key];
-            if (!job || job.owner !== task.owner || job.fingerprint !== task.fingerprint) return;
+            if (!job || job.owner !== task.owner || job.fingerprint !== task.fingerprint) {
+                return;
+            }
             job.status = job.attempts >= config.maxAttempts ? 'failed' : 'pending';
             job.nextAttemptAt = Date.now() + Math.min(hour, config.pollMs * 2 ** job.attempts);
             job.error = message.slice(0, 500);

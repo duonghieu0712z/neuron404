@@ -18,7 +18,9 @@ export async function listNeuronFiles(): Promise<string[]> {
     try {
         return (await readdir(NEURONS_DIR)).filter((entry) => entry.endsWith('.md')).sort();
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return [];
+        }
         throw error;
     }
 }
@@ -27,7 +29,9 @@ export async function readNeuronSnapshot(id: string) {
     const raw = await readFile(filePathFor(id), 'utf8');
     const parsed = matter(raw, {});
     const frontmatter = neuronFrontmatterSchema.parse(parsed.data);
-    if (frontmatter.id !== id) throw new Error(`Neuron ID does not match filename: ${id}`);
+    if (frontmatter.id !== id) {
+        throw new Error(`Neuron ID does not match filename: ${id}`);
+    }
     return {
         raw,
         revision: fingerprint(raw),
@@ -36,7 +40,9 @@ export async function readNeuronSnapshot(id: string) {
 }
 
 export async function readNeuronFile(fileName: string): Promise<Neuron> {
-    if (!fileName.endsWith('.md')) throw new Error('Expected a Markdown neuron');
+    if (!fileName.endsWith('.md')) {
+        throw new Error('Expected a Markdown neuron');
+    }
     return (await readNeuronSnapshot(fileName.slice(0, -3))).neuron;
 }
 
@@ -53,8 +59,9 @@ export async function archiveNeuron(id: string, raw: string) {
     const directory = path.join(CONTENT_DIR, 'history', safeId(id));
     const filePath = path.join(directory, `${revision}.md`);
     await atomicWrite(filePath, raw, true);
-    if ((await readFile(filePath, 'utf8')) !== raw)
+    if ((await readFile(filePath, 'utf8')) !== raw) {
         throw new Error(`Revision integrity failure: ${id}`);
+    }
     return revision;
 }
 

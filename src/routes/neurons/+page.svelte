@@ -13,7 +13,9 @@
     const panel = getNeuronPanelContext();
 
     function handleClick(event: MouseEvent, id: string) {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+            return;
+        }
         event.preventDefault();
         void panel.open(id);
     }

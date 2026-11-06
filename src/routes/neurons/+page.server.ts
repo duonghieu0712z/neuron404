@@ -14,21 +14,22 @@ export const load: PageServerLoad = async ({ url }) => {
 
     const matches = query ? await searchNeurons(db, query, 50) : [];
     const order = new Map(matches.map((match, index) => [match.id, index]));
-    const rows = query
-        ? matches.length
-            ? (
-                  await db
-                      .select()
-                      .from(neurons)
-                      .where(
-                          inArray(
-                              neurons.id,
-                              matches.map((match) => match.id),
-                          ),
-                      )
-              ).sort((a, b) => order.get(a.id)! - order.get(b.id)!)
-            : []
-        : await db.select().from(neurons).orderBy(desc(neurons.updatedAt));
+    let rows: (typeof neurons.$inferSelect)[] = [];
+    if (!query) {
+        rows = await db.select().from(neurons).orderBy(desc(neurons.updatedAt));
+    } else if (matches.length) {
+        rows = (
+            await db
+                .select()
+                .from(neurons)
+                .where(
+                    inArray(
+                        neurons.id,
+                        matches.map((match) => match.id),
+                    ),
+                )
+        ).sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+    }
 
     const groups = (await readRegions())
         .map(({ id, title }) => ({
@@ -38,7 +39,9 @@ export const load: PageServerLoad = async ({ url }) => {
         }))
         .filter((group) => group.neurons.length > 0);
     const unfiled = rows.filter((neuron) => neuron.regions.length === 0);
-    if (unfiled.length) groups.push({ id: 'region:unfiled', title: 'Unfiled', neurons: unfiled });
+    if (unfiled.length) {
+        groups.push({ id: 'region:unfiled', title: 'Unfiled', neurons: unfiled });
+    }
 
     return { groups, query };
 };

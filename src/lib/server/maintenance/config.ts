@@ -19,8 +19,9 @@ export interface MaintenanceConfig {
 export function readMaintenanceConfig(env = process.env): MaintenanceConfig {
     const selected = env.NEURON404_MAINTENANCE_PROVIDER?.trim().toLowerCase();
     const provider = selected && selected !== 'none' ? selected : undefined;
-    if (provider && !maintenanceAgents.has(provider))
+    if (provider && !maintenanceAgents.has(provider)) {
         throw new Error(`Unknown maintenance provider: ${provider}`);
+    }
     function number(
         name: string,
         fallback: number,
@@ -35,10 +36,11 @@ export function readMaintenanceConfig(env = process.env): MaintenanceConfig {
             value < minimum ||
             value > maximum ||
             (integer && !Number.isInteger(value))
-        )
+        ) {
             throw new Error(
                 `NEURON404_MAINTENANCE_${name} must be between ${minimum} and ${maximum}`,
             );
+        }
         return value;
     }
     return {

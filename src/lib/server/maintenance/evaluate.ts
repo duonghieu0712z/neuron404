@@ -44,12 +44,14 @@ export async function buildReviewBundle(
             ...(neuron.supersededBy ? [neuron.supersededBy] : []),
         ]),
     );
-    for (const { neuron } of snapshots)
+    for (const { neuron } of snapshots) {
         if (
             neuron.synapses.some((edge) => memberIds.has(edge.target)) ||
             (neuron.supersededBy && memberIds.has(neuron.supersededBy))
-        )
+        ) {
             directIds.add(neuron.id);
+        }
+    }
     const vocabulary = new Set(members.flatMap((snapshot) => [...tokens(snapshot)]));
     const candidates = snapshots
         .filter(({ neuron }) => !memberIds.has(neuron.id) && !directIds.has(neuron.id))
@@ -179,7 +181,9 @@ function expandReferences(
     function expand(items: { ref: string }[]) {
         return items.map(({ ref }) => {
             const item = catalog.get(ref);
-            if (!item) throw new Error('Review references an unknown evidence passage.');
+            if (!item) {
+                throw new Error('Review references an unknown evidence passage.');
+            }
             return item;
         });
     }
@@ -271,11 +275,13 @@ function validate(
     const sources = new Map(bundle.sources.map(({ id, source }) => [id, source.content]));
     const seen = new Set<string>();
     for (const check of output.checks) {
-        if (!subjects.includes(check.subject) || seen.has(check.subject))
+        if (!subjects.includes(check.subject) || seen.has(check.subject)) {
             throw new Error('Review has duplicate or unknown check subjects.');
+        }
         seen.add(check.subject);
-        if (check.verdict === 'supported' && !check.evidence.length)
+        if (check.verdict === 'supported' && !check.evidence.length) {
             throw new Error('A supported check requires quoted evidence.');
+        }
         if (
             candidate !== undefined &&
             check.verdict === 'supported' &&
@@ -284,31 +290,35 @@ function validate(
                     item.kind === 'neuron' &&
                     bundle.members.some(({ neuron }) => neuron.id === item.id),
             )
-        )
+        ) {
             throw new Error(
                 'A supported overview paragraph must quote a member neuron, not itself.',
             );
+        }
         if (candidate === undefined && check.verdict === 'supported') {
             const member = bundle.members.find(({ neuron }) => neuron.id === check.subject)!;
             if (
                 !check.evidence.some(
                     (item) => item.kind === 'source' && member.neuron.sources.includes(item.id),
                 )
-            )
+            ) {
                 throw new Error(
                     'A source-supported neuron check must quote its own supplied source.',
                 );
+            }
         }
     }
-    if (seen.size !== subjects.length)
+    if (seen.size !== subjects.length) {
         throw new Error('Review did not check every supplied subject.');
+    }
     if (candidate === undefined) {
         for (const check of output.checks) {
             if (
                 check.verdict === 'supported' ||
                 output.findings.some((finding) => finding.neurons.includes(check.subject))
-            )
+            ) {
                 continue;
+            }
             const member = bundle.members.find(({ neuron }) => neuron.id === check.subject)!;
             output.findings.push({
                 kind: check.verdict === 'unverifiable' ? 'missing-evidence' : 'unsupported',
@@ -334,20 +344,23 @@ function validate(
         ...output.checks.flatMap((check) => check.evidence),
         ...output.findings.flatMap((finding) => finding.evidence),
     ]) {
-        const text =
-            evidence.kind === 'neuron'
-                ? neurons.get(evidence.id)
-                : evidence.kind === 'source'
-                  ? sources.get(evidence.id)
-                  : evidence.id === bundle.region.id
-                    ? candidate
-                    : undefined;
-        if (text === undefined || !text.includes(evidence.quote))
+        let text: string | undefined;
+        if (evidence.kind === 'neuron') {
+            text = neurons.get(evidence.id);
+        } else if (evidence.kind === 'source') {
+            text = sources.get(evidence.id);
+        } else if (evidence.id === bundle.region.id) {
+            text = candidate;
+        }
+
+        if (text === undefined || !text.includes(evidence.quote)) {
             throw new Error('Review evidence quote does not match its supplied artifact.');
+        }
     }
     for (const finding of output.findings) {
-        if (finding.neurons.some((id) => !neurons.has(id)))
+        if (finding.neurons.some((id) => !neurons.has(id))) {
             throw new Error('Finding references a neuron outside the reviewed scope.');
+        }
         if (
             finding.synapse &&
             (!neurons.has(finding.synapse.source) ||
@@ -356,13 +369,16 @@ function validate(
                 !['source', 'target'].every((key) =>
                     finding.neurons.includes(finding.synapse![key as 'source' | 'target']),
                 ))
-        )
+        ) {
             throw new Error('Proposed synapse endpoints must be distinct reviewed neurons.');
+        }
     }
-    if (output.findings.length || output.checks.some((check) => check.verdict !== 'supported'))
+    if (output.findings.length || output.checks.some((check) => check.verdict !== 'supported')) {
         output.verdict = 'needs-review';
-    if (output.verdict === 'pass' && output.findings.length)
+    }
+    if (output.verdict === 'pass' && output.findings.length) {
         throw new Error('A passing review cannot contain unresolved findings.');
+    }
     return output;
 }
 
@@ -405,8 +421,9 @@ export function validateReviewOutput(output: ReviewOutput, bundle: ReviewBundle,
     if (body !== undefined) {
         const ids = new Set(bundle.members.map(({ neuron }) => neuron.id));
         const citations = [...body.matchAll(/\]\(neuron:([a-zA-Z0-9_-]+)\)/g)];
-        if (!citations.length || citations.some((match) => !ids.has(match[1])))
+        if (!citations.length || citations.some((match) => !ids.has(match[1]))) {
             throw new Error('Overview citations must reference its member neurons.');
+        }
     }
     return validate(
         parsed,
@@ -426,10 +443,13 @@ export async function verifyOverview(
 ) {
     const ids = new Set(bundle.members.map(({ neuron }) => neuron.id));
     const citations = [...body.matchAll(/\]\(neuron:([a-zA-Z0-9_-]+)\)/g)];
-    if (!citations.length || citations.some((match) => !ids.has(match[1])))
+    if (!citations.length || citations.some((match) => !ids.has(match[1]))) {
         throw new Error('Overview citations must reference its member neurons.');
+    }
     const sections = paragraphs(body);
-    if (!sections.length) throw new Error('Overview has no paragraphs to verify.');
+    if (!sections.length) {
+        throw new Error('Overview has no paragraphs to verify.');
+    }
     const prompt =
         common +
         '\nCheck EVERY supplied paragraph against the member neurons. Return one check with subject=paragraph ID per paragraph. A check is supported only if ALL factual claims, scope, dates, qualifications and relationships in that paragraph are supported. Check that each neuron: citation belongs to the Region and supports the attached claim. Flag missing important disagreement or qualifications. Pass only when every paragraph is supported and there are no findings. Evidence kind neuron must quote the actual member; overview evidence uses the Region ID and quotes the candidate. Do not use source evidence: this check establishes overview-to-neuron fidelity only.';

@@ -25,14 +25,21 @@ export function labelBox(node: LabelCandidate, placement: LabelPlacement): Box {
     const gap = node.radius + 5;
     const halfWidth = node.width / 2 + (node.required ? 8 : 4);
     const halfHeight = node.required ? 14 : 9;
-    const x =
-        node.x +
-        (placement === 'right'
-            ? gap + node.width / 2
-            : placement === 'left'
-              ? -gap - node.width / 2
-              : 0);
-    const y = node.y + (placement === 'below' ? gap + 6 : placement === 'above' ? -gap - 6 : 0);
+    let x = node.x;
+    let y = node.y;
+
+    if (placement === 'right') {
+        x += gap + node.width / 2;
+    } else if (placement === 'left') {
+        x -= gap + node.width / 2;
+    }
+
+    if (placement === 'below') {
+        y += gap + 6;
+    } else if (placement === 'above') {
+        y -= gap + 6;
+    }
+
     return {
         left: x - halfWidth,
         right: x + halfWidth,
@@ -84,7 +91,9 @@ export function chooseLabelPlacements(candidates: LabelCandidate[], width: numbe
                         ))
                 );
             }) ?? (candidate.priority > 0 ? free[0] : undefined);
-        if (!position) continue;
+        if (!position) {
+            continue;
+        }
         placements.set(candidate.id, position);
         occupied.push(labelBox(candidate, position));
     }

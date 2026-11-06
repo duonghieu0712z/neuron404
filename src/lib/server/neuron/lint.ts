@@ -63,13 +63,14 @@ export async function lintNeurons(): Promise<LintIssue[]> {
         }
         validNeurons.set(result.data.id, result.data);
         for (const id of result.data.regions) {
-            if (!regionIds.has(id))
+            if (!regionIds.has(id)) {
                 issues.push({
                     fileName,
                     kind: 'unknown-region',
                     message: `Unknown region "${id}"`,
                     neuronId: result.data.id,
                 });
+            }
         }
     }
 
@@ -91,8 +92,9 @@ export async function lintNeurons(): Promise<LintIssue[]> {
 
     for (const neuron of validNeurons.values()) {
         let message = '';
-        if ((neuron.lifecycle === 'superseded') !== Boolean(neuron.supersededBy))
+        if ((neuron.lifecycle === 'superseded') !== Boolean(neuron.supersededBy)) {
             message = 'Invalid replacement state';
+        }
         const visited = new Set([neuron.id]);
         let replacement = neuron.supersededBy;
         while (replacement) {
@@ -108,13 +110,14 @@ export async function lintNeurons(): Promise<LintIssue[]> {
             }
             replacement = target.supersededBy;
         }
-        if (message)
+        if (message) {
             issues.push({
                 fileName: `${neuron.id}.md`,
                 kind: 'invalid-lifecycle',
                 message,
                 neuronId: neuron.id,
             });
+        }
         for (const id of neuron.sources) {
             try {
                 await readSource(id);

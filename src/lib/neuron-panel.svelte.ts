@@ -26,7 +26,9 @@ export function createNeuronPanelContext(): NeuronPanelContext {
 
         if (response?.ok) {
             const result = (await response.json()) as NeuronDetail;
-            if (currentRequest !== requestId) return;
+            if (currentRequest !== requestId) {
+                return;
+            }
             region = null;
             selected = result;
         }
@@ -38,7 +40,9 @@ export function createNeuronPanelContext(): NeuronPanelContext {
         const response = await fetch(href).catch(() => null);
         if (response?.ok) {
             const result = (await response.json()) as RegionOverview;
-            if (currentRequest !== requestId) return;
+            if (currentRequest !== requestId) {
+                return;
+            }
             selected = null;
             region = result;
         }
@@ -68,6 +72,8 @@ export function createNeuronPanelContext(): NeuronPanelContext {
 
 export function getNeuronPanelContext(): NeuronPanelContext {
     const context = getContext<NeuronPanelContext | undefined>(KEY);
-    if (!context) throw new Error('NeuronPanelContext not found');
+    if (!context) {
+        throw new Error('NeuronPanelContext not found');
+    }
     return context;
 }

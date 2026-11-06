@@ -22,6 +22,12 @@
         details: ReviewView['evidenceDetails'];
         onSelectNeuron?: (id: string) => void;
     } = $props();
+    const sourceLabels = {
+        overview: 'Region overview',
+        source: 'Captured source',
+        neuron: 'Neuron',
+    };
+
     let expanded = $state<Record<string, boolean>>({});
     let overflowing = $state<Record<string, boolean>>({});
 
@@ -58,11 +64,7 @@
                 <section class="min-w-0 space-y-2 border-l pl-3">
                     <div class="space-y-1">
                         <p class="text-[10px] text-muted-foreground">
-                            {item.kind === 'overview'
-                                ? 'Region overview'
-                                : item.kind === 'source'
-                                  ? 'Captured source'
-                                  : 'Neuron'}
+                            {sourceLabels[item.kind]}
                         </p>
                         {#if item.kind === 'neuron' && source?.available}
                             <a
@@ -76,8 +78,9 @@
                                         event.ctrlKey ||
                                         event.shiftKey ||
                                         event.altKey
-                                    )
+                                    ) {
                                         return;
+                                    }
                                     event.preventDefault();
                                     onSelectNeuron(item.id);
                                 }}

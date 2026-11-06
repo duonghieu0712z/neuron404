@@ -11,7 +11,9 @@ export function fingerprint(content: string) {
 }
 
 export function safeId(id: string) {
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id)) throw new Error('Invalid neuron ID');
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id)) {
+        throw new Error('Invalid neuron ID');
+    }
     return id;
 }
 
@@ -30,9 +32,13 @@ export async function atomicWrite(filePath: string, content: string, immutable =
             try {
                 await link(temporary, filePath);
             } catch (error) {
-                if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+                if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+                    throw error;
+                }
             }
-        } else await rename(temporary, filePath);
+        } else {
+            await rename(temporary, filePath);
+        }
     } finally {
         await rm(temporary, { force: true });
     }
@@ -47,12 +53,15 @@ export async function withStorageLock<T>(action: () => Promise<T>): Promise<T> {
         try {
             lock = await open(lockPath, 'wx', 0o600);
         } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-            if (Date.now() >= deadline)
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+                throw error;
+            }
+            if (Date.now() >= deadline) {
                 throw new Error(
                     'Storage is locked. Retry or recover content/.write-lock after a crashed writer.',
                     { cause: error },
                 );
+            }
             await new Promise((resolve) => setTimeout(resolve, 50));
         }
     }

@@ -14,19 +14,24 @@ import { CONTENT_DIR, fingerprint, safeId } from './storage';
 import { readNeuronSnapshot } from './store';
 
 export async function readNeuronContext(ids: string[]) {
-    if (!ids.length || ids.length > 50)
+    if (!ids.length || ids.length > 50) {
         throw new Error('Read requires between 1 and 50 neuron IDs');
+    }
     return withIndexedStore(async (db) => {
         const cache = new Map<string, Awaited<ReturnType<typeof readNeuronSnapshot>>>();
         const read = async (id: string) => {
             const cached = cache.get(id);
-            if (cached) return cached;
+            if (cached) {
+                return cached;
+            }
             const snapshot = await readIndexedNeuron(db, id);
             cache.set(id, snapshot);
             return snapshot;
         };
         const selected = [];
-        for (const id of ids) selected.push(await read(id));
+        for (const id of ids) {
+            selected.push(await read(id));
+        }
         const regionIds = [...new Set(selected.flatMap(({ neuron }) => neuron.regions))];
         const reviews = (
             await Promise.all(regionIds.map((id) => readRegionReviews(id, undefined, db)))
@@ -69,7 +74,9 @@ export async function readNeuronContext(ids: string[]) {
                     .map((edge) => edge.source),
             ];
             for (const target of cautions) {
-                if (relatedIds.has(target)) continue;
+                if (relatedIds.has(target)) {
+                    continue;
+                }
                 if (relatedIds.size >= 50) {
                     truncated = true;
                     break;
@@ -114,9 +121,13 @@ export async function readNeuronContext(ids: string[]) {
 export async function readNeuronHistory(id: string, revision?: string) {
     const directory = path.join(CONTENT_DIR, 'history', safeId(id));
     if (revision) {
-        if (!/^[a-f0-9]{64}$/.test(revision)) throw new Error('Invalid revision');
+        if (!/^[a-f0-9]{64}$/.test(revision)) {
+            throw new Error('Invalid revision');
+        }
         const raw = await readFile(path.join(directory, `${revision}.md`), 'utf8');
-        if (fingerprint(raw) !== revision) throw new Error('Revision integrity failure');
+        if (fingerprint(raw) !== revision) {
+            throw new Error('Revision integrity failure');
+        }
         return { id, revision, raw };
     }
     try {
@@ -127,7 +138,9 @@ export async function readNeuronHistory(id: string, revision?: string) {
                 .map((file) => file.slice(0, -3)),
         };
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { id, revisions: [] };
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return { id, revisions: [] };
+        }
         throw error;
     }
 }
@@ -149,13 +162,16 @@ export async function readCatalog(options: CatalogOptions = {}) {
         limit > 50 ||
         !Number.isInteger(offset) ||
         offset < 0
-    )
+    ) {
         throw new Error('Catalog requires limit 1-50 and a nonnegative integer offset');
+    }
     return withIndexedStore(async (db) => {
         const regions = await readRegions();
         if (options.region) {
             const region = regions.find((item) => item.id === options.region);
-            if (!region) throw new Error(`Unknown region: ${options.region}`);
+            if (!region) {
+                throw new Error(`Unknown region: ${options.region}`);
+            }
             const membership = sql`EXISTS (SELECT 1 FROM json_each(${neurons.regions}) WHERE value = ${region.id})`;
             const condition = options.includeHistory
                 ? membership
@@ -231,11 +247,15 @@ export async function readNeighbors(
         limit > 50 ||
         !Number.isInteger(offset) ||
         offset < 0
-    )
+    ) {
         throw new Error('Neighbors requires limit 1-50 and a nonnegative integer offset');
-    if (!['both', 'incoming', 'outgoing'].includes(direction)) throw new Error('Unknown direction');
-    if (options.kind && !SYNAPSE_KINDS.some((kind) => kind === options.kind))
+    }
+    if (!['both', 'incoming', 'outgoing'].includes(direction)) {
+        throw new Error('Unknown direction');
+    }
+    if (options.kind && !SYNAPSE_KINDS.some((kind) => kind === options.kind)) {
         throw new Error('Unknown synapse kind');
+    }
     return withIndexedStore(async (db) => {
         await readIndexedNeuron(db, id);
         const edges = sql`

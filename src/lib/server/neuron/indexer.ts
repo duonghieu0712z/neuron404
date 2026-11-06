@@ -20,7 +20,9 @@ async function fileStamp(file: string) {
         const value = await stat(file, { bigint: true });
         return `${value.ino}:${value.size}:${value.mtimeNs}:${value.ctimeNs}`;
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return '';
+        }
         throw error;
     }
 }
@@ -91,41 +93,54 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
         ),
         async (file) => {
             const snapshot = await readNeuronSnapshot(file.id);
-            if (file.stamp !== (await fileStamp(path.join(NEURONS_DIR, `${file.id}.md`))))
+            if (file.stamp !== (await fileStamp(path.join(NEURONS_DIR, `${file.id}.md`)))) {
                 throw new Error(`Neuron ${file.id} changed during indexing. Retry the query.`);
+            }
             return { ...snapshot, stamp: file.stamp };
         },
     );
     const fileIds = new Set(files.map((file) => file.id));
     const removed = existing.filter((row) => !fileIds.has(row.id));
     const byId = new Map(existing.filter((row) => fileIds.has(row.id)).map((row) => [row.id, row]));
-    for (const { neuron, revision, stamp } of parsed)
+    for (const { neuron, revision, stamp } of parsed) {
         byId.set(neuron.id, {
             ...neuron,
             supersededBy: neuron.supersededBy ?? null,
             revision,
             fileStamp: stamp,
         });
+    }
     const regionIds = new Set((await readRegions()).map((region) => region.id));
     for (const neuron of byId.values()) {
-        for (const id of neuron.regions)
-            if (!regionIds.has(id))
+        for (const id of neuron.regions) {
+            if (!regionIds.has(id)) {
                 throw new Error(`Unknown region "${id}" on neuron ${neuron.id}`);
-        if ((neuron.lifecycle === 'superseded') !== Boolean(neuron.supersededBy))
+            }
+        }
+        if ((neuron.lifecycle === 'superseded') !== Boolean(neuron.supersededBy)) {
             throw new Error(`Invalid replacement state on neuron ${neuron.id}`);
+        }
         const visited = new Set([neuron.id]);
         let replacement = neuron.supersededBy;
         while (replacement) {
-            if (visited.has(replacement)) throw new Error('Supersession cycle');
+            if (visited.has(replacement)) {
+                throw new Error('Supersession cycle');
+            }
             visited.add(replacement);
             const target = byId.get(replacement);
-            if (!target) throw new Error(`Unknown replacement: ${replacement}`);
+            if (!target) {
+                throw new Error(`Unknown replacement: ${replacement}`);
+            }
             replacement = target.supersededBy;
         }
     }
-    for (const { neuron } of parsed)
-        for (const edge of neuron.synapses)
-            if (!byId.has(edge.target)) throw new Error(`Unknown synapse target: ${edge.target}`);
+    for (const { neuron } of parsed) {
+        for (const edge of neuron.synapses) {
+            if (!byId.has(edge.target)) {
+                throw new Error(`Unknown synapse target: ${edge.target}`);
+            }
+        }
+    }
     if (removed.length) {
         const reparsed = new Set(parsed.map(({ neuron }) => neuron.id));
         const incoming = await db
@@ -137,9 +152,11 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
                     removed.map((row) => row.id),
                 ),
             );
-        for (const edge of incoming)
-            if (byId.has(edge.sourceNeuronId) && !reparsed.has(edge.sourceNeuronId))
+        for (const edge of incoming) {
+            if (byId.has(edge.sourceNeuronId) && !reparsed.has(edge.sourceNeuronId)) {
                 throw new Error(`Unknown synapse target: ${edge.targetNeuronId}`);
+            }
+        }
     }
     await mapFiles([...new Set(parsed.flatMap(({ neuron }) => neuron.sources))], readSource);
     const changed = parsed.filter(
@@ -148,7 +165,9 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
     );
     let synapseCount = 0;
     await db.transaction(async (tx) => {
-        if (recreateFts) await tx.run(sql`DROP TABLE IF EXISTS neurons_fts`);
+        if (recreateFts) {
+            await tx.run(sql`DROP TABLE IF EXISTS neurons_fts`);
+        }
         await tx.run(sql`CREATE VIRTUAL TABLE IF NOT EXISTS neurons_fts USING fts5(
             id UNINDEXED, title, body, aliases, retrieval_cues,
             tokenize='unicode61 remove_diacritics 2'
@@ -206,25 +225,31 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
                 const saved = byRelation.get(JSON.stringify([edge.target, edge.kind]))?.shift();
                 if (saved) {
                     remaining.delete(saved.id);
-                    if (saved.note !== (edge.note ?? null))
+                    if (saved.note !== (edge.note ?? null)) {
                         await tx
                             .update(synapses)
                             .set({ note: edge.note ?? null })
                             .where(eq(synapses.id, saved.id));
-                } else
+                    }
+                } else {
                     await tx.insert(synapses).values({
                         sourceNeuronId: neuron.id,
                         targetNeuronId: edge.target,
                         kind: edge.kind,
                         note: edge.note,
                     });
+                }
             }
-            for (const id of remaining) await tx.delete(synapses).where(eq(synapses.id, id));
+            for (const id of remaining) {
+                await tx.delete(synapses).where(eq(synapses.id, id));
+            }
         }
         const changedIds = new Set(changed.map(({ neuron }) => neuron.id));
-        for (const { neuron, stamp } of parsed)
-            if (!changedIds.has(neuron.id))
+        for (const { neuron, stamp } of parsed) {
+            if (!changedIds.has(neuron.id)) {
                 await tx.update(neurons).set({ fileStamp: stamp }).where(eq(neurons.id, neuron.id));
+            }
+        }
         [{ synapseCount }] = await tx.select({ synapseCount: count() }).from(synapses);
         const next = {
             id: STATE_ID,

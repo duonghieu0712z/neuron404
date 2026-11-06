@@ -78,28 +78,44 @@
                     { signal: controller.signal },
                 );
                 const result = await response.json();
-                if (!response.ok)
+                if (!response.ok) {
                     throw new Error(
                         response.status === 400 ? result.message : 'Search is unavailable.',
                     );
+                }
                 if (
                     !Array.isArray(result.ids) ||
                     !result.ids.every((id: unknown) => typeof id === 'string')
-                )
+                ) {
                     throw new Error('Search is unavailable.');
-                if (controller.signal.aborted) return;
+                }
+                if (controller.signal.aborted) {
+                    return;
+                }
                 const known = new Set(nodes.map((node) => node.id));
                 matchingNodeIds = new Set<string>(result.ids.filter((id: string) => known.has(id)));
             } catch (cause) {
-                if (controller.signal.aborted) return;
+                if (controller.signal.aborted) {
+                    return;
+                }
                 matchingNodeIds = null;
                 searchError = cause instanceof Error ? cause.message : 'Search is unavailable.';
             } finally {
-                if (!controller.signal.aborted) searching = false;
+                if (!controller.signal.aborted) {
+                    searching = false;
+                }
             }
         })();
         return () => controller.abort();
     });
+
+    const legendClasses = {
+        dashed: 'w-4 border-t border-dashed',
+        line: 'h-0.5 w-4',
+        circle: 'size-2.5 rounded-full',
+        hexagon: 'h-3 w-2.5',
+    };
+    const membershipShortLabels = { hidden: 'Off', auto: 'Auto', all: 'All' };
 
     const NODE_SIZE = 8;
     const LABEL_MAX_LENGTH = 40;
@@ -196,6 +212,12 @@
     );
     let applyMembership = $state<((mode: MembershipMode) => void) | null>(null);
     let reducedMotion = $state(false);
+    const motionTooltip = $derived.by(() => {
+        if (reducedMotion) {
+            return 'Reduced motion is enabled';
+        }
+        return motionEnabled ? 'Pause motion' : 'Resume motion';
+    });
     let applyMotion = $state<((enabled: boolean) => void) | null>(null);
     let applyLabels = $state<((visible: boolean) => void) | null>(null);
     let applyFocus = $state<((id: string | null, selected: string | null) => void) | null>(null);
@@ -211,14 +233,25 @@
         try {
             const saved = JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? 'null');
             if (saved && typeof saved === 'object') {
-                if (typeof saved.overviewOpen === 'boolean') overviewOpen = saved.overviewOpen;
-                if (typeof saved.controlsOpen === 'boolean') controlsOpen = saved.controlsOpen;
-                if (typeof saved.showLabels === 'boolean') showLabels = saved.showLabels;
-                if (typeof saved.motionEnabled === 'boolean') motionEnabled = saved.motionEnabled;
-                if (isMembershipMode(saved.membershipMode)) membershipMode = saved.membershipMode;
+                if (typeof saved.overviewOpen === 'boolean') {
+                    overviewOpen = saved.overviewOpen;
+                }
+                if (typeof saved.controlsOpen === 'boolean') {
+                    controlsOpen = saved.controlsOpen;
+                }
+                if (typeof saved.showLabels === 'boolean') {
+                    showLabels = saved.showLabels;
+                }
+                if (typeof saved.motionEnabled === 'boolean') {
+                    motionEnabled = saved.motionEnabled;
+                }
+                if (isMembershipMode(saved.membershipMode)) {
+                    membershipMode = saved.membershipMode;
+                }
                 for (const key of Object.keys(sections) as (keyof typeof sections)[]) {
-                    if (typeof saved.sections?.[key] === 'boolean')
+                    if (typeof saved.sections?.[key] === 'boolean') {
                         sections[key] = saved.sections[key];
+                    }
                 }
             }
         } catch {
@@ -228,7 +261,9 @@
     });
 
     $effect(() => {
-        if (!preferencesReady) return;
+        if (!preferencesReady) {
+            return;
+        }
         const preferences = JSON.stringify({
             overviewOpen,
             controlsOpen,
@@ -245,10 +280,14 @@
     });
 
     function fitNetworkInView() {
-        if (!renderer) return;
+        if (!renderer) {
+            return;
+        }
         const graph = renderer.getGraph();
         const nodes = graph.nodes().filter((id) => !renderer!.getNodeState(id).isHidden);
-        if (nodes.length === 0) return;
+        if (nodes.length === 0) {
+            return;
+        }
 
         const xs = nodes.map((id) => graph.getNodeAttribute(id, 'x') as number);
         const ys = nodes.map((id) => graph.getNodeAttribute(id, 'y') as number);
@@ -275,12 +314,16 @@
     }
 
     async function refreshNetwork() {
-        if (refreshing) return;
+        if (refreshing) {
+            return;
+        }
         refreshing = true;
         refreshFeedback = true;
         try {
             await invalidateAll();
-            for (const id of Object.keys(positions)) delete positions[id];
+            for (const id of Object.keys(positions)) {
+                delete positions[id];
+            }
             layoutRevision++;
             await tick();
             renderer?.refresh();
@@ -365,7 +408,9 @@
     });
 
     $effect(() => {
-        if (!preferencesReady || !containerEl || data.nodes.length === 0) return;
+        if (!preferencesReady || !containerEl || data.nodes.length === 0) {
+            return;
+        }
         void layoutRevision;
 
         const isDark = mode.current === 'dark';
@@ -380,7 +425,9 @@
         let searchMatches: Set<string> | null = null;
         const matchesSearch = (id: string) => {
             const matches = searchMatches;
-            if (!matches) return true;
+            if (!matches) {
+                return true;
+            }
             const region = regionByNodeId.get(id);
             return region ? region.nodeIds.some((member) => matches.has(member)) : matches.has(id);
         };
@@ -391,6 +438,16 @@
         const regionByNodeId = new Map(
             data.regions.map((region) => [getRegionNodeId(region.id), region]),
         );
+        function focusPriority(id: string) {
+            if (id === activeNode) {
+                return 3;
+            }
+            if (id === selectedNode) {
+                return 2;
+            }
+            return regionByNodeId.has(id) ? 1 : 0;
+        }
+
         const nodeIds = new Set(data.nodes.map((node) => node.id));
         const visualNodes: SimNode[] = [
             ...data.nodes,
@@ -514,15 +571,10 @@
             nodeReducer: (id, attributes, nodeAttributes) => {
                 const expanded = id === activeNode || id === selectedNode;
                 const searchDimmed = !matchesSearch(id) && !expanded;
-                const labelDepth =
-                    id === activeNode
-                        ? 'hoveredLabels'
-                        : id === selectedNode
-                          ? 'selectedLabels'
-                          : regionByNodeId.has(id)
-                            ? 'regionLabels'
-                            : 'nodes';
-                if (regionByNodeId.has(id))
+                const labelDepth = (
+                    ['nodes', 'regionLabels', 'selectedLabels', 'hoveredLabels'] as const
+                )[focusPriority(id)];
+                if (regionByNodeId.has(id)) {
                     return {
                         ...attributes,
                         label: nodeAttributes.label,
@@ -534,14 +586,17 @@
                         backdropArea: 'both',
                         backdropVisibility: expanded ? 'visible' : 'hidden',
                     };
-                if (searchDimmed) return { ...attributes, opacity: 0.2, labelVisibility: 'hidden' };
+                }
+                if (searchDimmed) {
+                    return { ...attributes, opacity: 0.2, labelVisibility: 'hidden' };
+                }
                 const label = expanded
                     ? nodeAttributes.label
                     : (compactLabels[id] ?? nodeAttributes.shortLabel);
                 const placement = labelPlacements.get(id);
                 const labelVisibility =
                     (neuronLabelsVisible || expanded) && placement ? 'visible' : 'hidden';
-                if (searchMatches !== null || !activeNode)
+                if (searchMatches !== null || !activeNode) {
                     return {
                         ...attributes,
                         label,
@@ -549,6 +604,7 @@
                         labelPosition: placement ?? 'below',
                         labelDepth,
                     };
+                }
                 if (!neighborhood.has(id) && id !== selectedNode) {
                     return { opacity: 0.2, labelVisibility: 'hidden' };
                 }
@@ -581,12 +637,15 @@
                     (regionByNodeId.has(activeNode)
                         ? neighborhood.has(source) && neighborhood.has(target)
                         : source === activeNode || target === activeNode);
-                if (!connected && (!matchesSearch(source) || !matchesSearch(target)))
+                if (!connected && (!matchesSearch(source) || !matchesSearch(target))) {
                     return {
                         ...getEdgeAppearance(network.getEdgeAttribute(id, 'color'), 0.12),
                         size: 1,
                     };
-                if (!activeNode) return attributes;
+                }
+                if (!activeNode) {
+                    return attributes;
+                }
                 return {
                     ...getEdgeAppearance(
                         network.getEdgeAttribute(id, 'color'),
@@ -617,7 +676,9 @@
             sigmaInstance.resize();
             const { width, height } = sigmaInstance.getDimensions();
             const cameraState = sigmaInstance.getCamera().getState();
-            if (regionContext) regionContext.font = '12px "Inter Variable", sans-serif';
+            if (regionContext) {
+                regionContext.font = '12px "Inter Variable", sans-serif';
+            }
             const textChanged: string[] = [];
             const candidates = network
                 .nodes()
@@ -661,14 +722,7 @@
                         width: measureLabel(label),
                         radius: sigmaInstance.scaleSize(attributes.size),
                         required: expanded,
-                        priority:
-                            id === activeNode
-                                ? 3
-                                : id === selectedNode
-                                  ? 2
-                                  : regionByNodeId.has(id)
-                                    ? 1
-                                    : 0,
+                        priority: focusPriority(id),
                     };
                 });
             const next = chooseLabelPlacements(candidates, width, height);
@@ -681,29 +735,42 @@
                     (id) => textChanged.includes(id) || next.get(id) !== labelPlacements.get(id),
                 );
             labelPlacements = next;
-            if (changed.length)
+            if (changed.length) {
                 sigmaInstance.refresh({
                     partialGraph: { nodes: changed },
                     skipIndexation: true,
                     schedule: true,
                 });
+            }
         };
         sigmaInstance.on('beforeRender', layoutLabels);
         let disposed = false;
         void document.fonts.ready.then(() => {
-            if (disposed) return;
-            for (const label of Object.keys(labelWidths)) delete labelWidths[label];
-            for (const id of Object.keys(compactLabels)) delete compactLabels[id];
+            if (disposed) {
+                return;
+            }
+            for (const label of Object.keys(labelWidths)) {
+                delete labelWidths[label];
+            }
+            for (const id of Object.keys(compactLabels)) {
+                delete compactLabels[id];
+            }
             sigmaInstance.scheduleRender();
         });
         const drawRegions = () => {
-            if (!regionContext) return;
+            if (!regionContext) {
+                return;
+            }
             const { width, height } = sigmaInstance.getDimensions();
             const pixelRatio = window.devicePixelRatio || 1;
             const bufferWidth = Math.round(width * pixelRatio);
             const bufferHeight = Math.round(height * pixelRatio);
-            if (regionCanvas.width !== bufferWidth) regionCanvas.width = bufferWidth;
-            if (regionCanvas.height !== bufferHeight) regionCanvas.height = bufferHeight;
+            if (regionCanvas.width !== bufferWidth) {
+                regionCanvas.width = bufferWidth;
+            }
+            if (regionCanvas.height !== bufferHeight) {
+                regionCanvas.height = bufferHeight;
+            }
             regionCanvas.style.width = `${width}px`;
             regionCanvas.style.height = `${height}px`;
             regionContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -715,7 +782,9 @@
                 const members = [...region.nodeIds, getRegionNodeId(region.id)].filter(
                     (id) => !sigmaInstance.getNodeState(id).isHidden,
                 );
-                if (!members.length) continue;
+                if (!members.length) {
+                    continue;
+                }
                 const points = members.map((id) =>
                     sigmaInstance.graphToViewport({
                         x: network.getNodeAttribute(id, 'x'),
@@ -729,7 +798,9 @@
                     ),
                 );
                 const hull = getRegionHull(points, padding);
-                if (!hull.length) continue;
+                if (!hull.length) {
+                    continue;
+                }
                 const highlighted = activeNode !== null && members.includes(activeNode);
                 const searchOpacity =
                     matchesSearch(getRegionNodeId(region.id)) || highlighted ? 1 : 0.25;
@@ -770,8 +841,9 @@
                 if (
                     sigmaInstance.getNodeState(link.source).isHidden ||
                     sigmaInstance.getNodeState(link.target).isHidden
-                )
+                ) {
                     continue;
+                }
                 const source = network.getNodeAttributes(link.source);
                 const target = network.getNodeAttributes(link.target);
                 const start = sigmaInstance.graphToViewport({ x: source.x, y: source.y });
@@ -781,8 +853,15 @@
                 const distance = Math.hypot(dx, dy);
                 const sourceInset = sigmaInstance.scaleSize(source.size) + 4;
                 const targetInset = sigmaInstance.scaleSize(target.size) + 3;
-                if (distance <= sourceInset + targetInset) continue;
-                const opacity = link.emphasized ? 0.6 : activeNode || selectedNode ? 0.16 : 0.3;
+                if (distance <= sourceInset + targetInset) {
+                    continue;
+                }
+                let opacity = 0.3;
+                if (link.emphasized) {
+                    opacity = 0.6;
+                } else if (activeNode || selectedNode) {
+                    opacity = 0.16;
+                }
                 regionContext.globalAlpha =
                     opacity *
                     (link.emphasized || (matchesSearch(link.source) && matchesSearch(link.target))
@@ -850,7 +929,9 @@
             sigmaInstance.refresh();
         };
         applyFilter = (ids) => {
-            if (searchMatches === ids) return;
+            if (searchMatches === ids) {
+                return;
+            }
             searchMatches = ids;
             sigmaInstance.refresh();
         };
@@ -864,19 +945,18 @@
                     ? selected
                     : null;
             const region = activeNode ? regionByNodeId.get(activeNode) : undefined;
-            neighborhood = new Set(
-                activeNode
-                    ? region
-                        ? [activeNode, ...region.nodeIds]
-                        : [
-                              activeNode,
-                              ...network.neighbors(activeNode),
-                              ...data.regions
-                                  .filter((item) => item.nodeIds.includes(activeNode!))
-                                  .map((item) => getRegionNodeId(item.id)),
-                          ]
-                    : [],
-            );
+            neighborhood = new Set<string>();
+            if (activeNode) {
+                const members = region
+                    ? region.nodeIds
+                    : [
+                          ...network.neighbors(activeNode),
+                          ...data.regions
+                              .filter((item) => item.nodeIds.includes(activeNode!))
+                              .map((item) => getRegionNodeId(item.id)),
+                      ];
+                neighborhood = new Set([activeNode, ...members]);
+            }
             updateSignals();
             sigmaInstance.refresh();
         };
@@ -892,7 +972,9 @@
         const syncPositions = (elapsed: number) => {
             network.updateEachNodeAttributes(
                 (id, attributes) => {
-                    if (id === draggedNode) return attributes;
+                    if (id === draggedNode) {
+                        return attributes;
+                    }
                     const node = simNodeById.get(id)!;
                     const position = { x: node.x ?? 0, y: node.y ?? 0 };
                     positions[id] = position;
@@ -920,11 +1002,15 @@
             }
         };
         const stopMotion = () => {
-            if (motionFrame !== null) cancelAnimationFrame(motionFrame);
+            if (motionFrame !== null) {
+                cancelAnimationFrame(motionFrame);
+            }
             motionFrame = null;
         };
         const startMotion = () => {
-            if (motionFrame === null) motionFrame = requestAnimationFrame(animateMotion);
+            if (motionFrame === null) {
+                motionFrame = requestAnimationFrame(animateMotion);
+            }
         };
 
         const freezePositions = () => {
@@ -952,10 +1038,15 @@
         applyMotion = (enabled) => {
             motionAllowed = enabled;
             synapseSignals.setEnabled(enabled);
-            if (!enabled) freezePositions();
-            else if (!document.hidden) {
-                if (entranceActive) startMotion();
-                if (simulation.alpha() > simulation.alphaMin()) simulation.restart();
+            if (!enabled) {
+                freezePositions();
+            } else if (!document.hidden) {
+                if (entranceActive) {
+                    startMotion();
+                }
+                if (simulation.alpha() > simulation.alphaMin()) {
+                    simulation.restart();
+                }
             }
         };
 
@@ -964,9 +1055,12 @@
                 stopMotion();
                 simulation.stop();
             } else {
-                if (motionAllowed && entranceActive) startMotion();
-                if (motionAllowed && simulation.alpha() > simulation.alphaMin())
+                if (motionAllowed && entranceActive) {
+                    startMotion();
+                }
+                if (motionAllowed && simulation.alpha() > simulation.alphaMin()) {
                     simulation.restart();
+                }
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);
@@ -992,15 +1086,21 @@
             target.fy = null;
             draggedNode = null;
             positions[node] = { x: target.x ?? 0, y: target.y ?? 0 };
-            if (motionAllowed) simulation.alphaTarget(0).restart();
-            else freezePositions();
+            if (motionAllowed) {
+                simulation.alphaTarget(0).restart();
+            } else {
+                freezePositions();
+            }
         });
 
         sigmaInstance.on('clickNode', ({ node, event }) => {
             event.original.stopPropagation();
             const region = regionByNodeId.get(node);
-            if (region) void panel.openRegion(region.id);
-            else void panel.open(node);
+            if (region) {
+                void panel.openRegion(region.id);
+            } else {
+                void panel.open(node);
+            }
         });
 
         sigmaInstance.on('clickStage', ({ event }) => {
@@ -1010,7 +1110,9 @@
 
         const resizeObserver = new ResizeObserver((entries) => {
             const { width, height } = entries[0]?.contentRect ?? { height: 0, width: 0 };
-            if (width === 0 || height === 0) return;
+            if (width === 0 || height === 0) {
+                return;
+            }
 
             sigmaInstance.scheduleRender();
         });
@@ -1049,13 +1151,7 @@
     <div class="flex items-center gap-2 text-xs">
         <span class="flex w-4 shrink-0 items-center justify-center" aria-hidden="true">
             <span
-                class={shape === 'dashed'
-                    ? 'w-4 border-t border-dashed'
-                    : shape === 'line'
-                      ? 'h-0.5 w-4'
-                      : shape === 'circle'
-                        ? 'size-2.5 rounded-full'
-                        : 'h-3 w-2.5'}
+                class={legendClasses[shape]}
                 style:background-color={shape === 'dashed' ? undefined : color}
                 style:border-color={shape === 'dashed' ? color : undefined}
                 style:clip-path={shape === 'hexagon'
@@ -1271,7 +1367,9 @@
                                                             'motion-safe:animate-[spin_600ms_linear_infinite]',
                                                     ]}
                                                     onanimationiteration={() => {
-                                                        if (!refreshing) refreshFeedback = false;
+                                                        if (!refreshing) {
+                                                            refreshFeedback = false;
+                                                        }
                                                     }}
                                                 />
                                             </span>
@@ -1309,11 +1407,7 @@
                             {/snippet}
                         </TooltipTrigger>
                         <TooltipContent side="left">
-                            Membership: {membershipMode === 'hidden'
-                                ? 'Off'
-                                : membershipMode === 'auto'
-                                  ? 'Auto'
-                                  : 'All'}
+                            Membership: {membershipShortLabels[membershipMode]}
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip>
@@ -1358,11 +1452,7 @@
                             {/snippet}
                         </TooltipTrigger>
                         <TooltipContent side="left">
-                            {reducedMotion
-                                ? 'Reduced motion is enabled'
-                                : motionEnabled
-                                  ? 'Pause motion'
-                                  : 'Resume motion'}
+                            {motionTooltip}
                         </TooltipContent>
                     </Tooltip>
                 </div>

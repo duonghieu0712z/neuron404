@@ -27,7 +27,9 @@ export async function withIndexedStore<T>(action: (db: Db) => Promise<T>) {
 }
 
 export async function readIndexSnapshots(db: Db, scope: { region?: string; ids?: string[] }) {
-    if (scope.ids?.length === 0) return [];
+    if (scope.ids?.length === 0) {
+        return [];
+    }
     const rows = await db
         .select({
             id: neurons.id,
@@ -57,8 +59,9 @@ export async function readIndexedNeuron(db: Db, id: string) {
             .select({ revision: neurons.revision })
             .from(neurons)
             .where(eq(neurons.id, id));
-        if (current[0]?.revision !== snapshot.revision)
+        if (current[0]?.revision !== snapshot.revision) {
             throw new Error(`Neuron ${id} changed during retrieval. Retry the query.`);
+        }
     }
     return snapshot;
 }

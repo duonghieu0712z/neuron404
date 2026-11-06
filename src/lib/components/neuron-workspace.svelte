@@ -50,7 +50,9 @@
         };
         const observer = new ResizeObserver(update);
         observer.observe(viewport);
-        if (viewport.firstElementChild) observer.observe(viewport.firstElementChild);
+        if (viewport.firstElementChild) {
+            observer.observe(viewport.firstElementChild);
+        }
         viewport.addEventListener('scroll', update, { passive: true });
         const frame = requestAnimationFrame(update);
         return () => {
@@ -62,7 +64,9 @@
 
     $effect(() => {
         const id = panel.selected?.neuron.id ?? panel.region?.region.id;
-        if (id) sidebarViewport?.scrollTo({ top: 0, behavior: 'auto' });
+        if (id) {
+            sidebarViewport?.scrollTo({ top: 0, behavior: 'auto' });
+        }
     });
 
     function jumpTo(edge: 'top' | 'bottom') {
@@ -76,9 +80,15 @@
 
     function handleWindowClick(event: MouseEvent) {
         const target = event.target;
-        if (!(target instanceof Element)) return;
-        if (!target.closest('[data-neuron-surface]')) return;
-        if (target.closest('[data-neuron-trigger]')) return;
+        if (!(target instanceof Element)) {
+            return;
+        }
+        if (!target.closest('[data-neuron-surface]')) {
+            return;
+        }
+        if (target.closest('[data-neuron-trigger]')) {
+            return;
+        }
 
         panel.close();
     }
@@ -89,7 +99,9 @@
 <SidebarProvider
     open={!!panel.selected || !!panel.region}
     onOpenChange={(open) => {
-        if (!open) panel.close();
+        if (!open) {
+            panel.close();
+        }
     }}
     style="--sidebar-width: 34rem;"
     class="relative h-full min-h-full w-full items-stretch"
