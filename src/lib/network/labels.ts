@@ -7,6 +7,7 @@ export interface LabelCandidate {
     radius: number;
     width: number;
     priority: number;
+    required?: boolean;
 }
 
 interface Box {
@@ -22,8 +23,8 @@ function intersects(a: Box, b: Box) {
 
 function labelBox(node: LabelCandidate, placement: LabelPlacement): Box {
     const gap = node.radius + 5;
-    const halfWidth = node.width / 2 + 4;
-    const halfHeight = 9;
+    const halfWidth = node.width / 2 + (node.required ? 8 : 4);
+    const halfHeight = node.required ? 14 : 9;
     const x =
         node.x +
         (placement === 'right'
@@ -52,9 +53,18 @@ export function chooseLabelPlacements(candidates: LabelCandidate[], width: numbe
         bottom: node.y + node.radius + 3,
     }));
     const ordered = [...candidates].sort(
-        (a, b) => b.priority - a.priority || b.radius - a.radius || a.id.localeCompare(b.id),
+        (a, b) =>
+            Number(b.required ?? false) - Number(a.required ?? false) ||
+            b.priority - a.priority ||
+            b.radius - a.radius ||
+            a.id.localeCompare(b.id),
     );
     for (const candidate of ordered) {
+        if (candidate.required) {
+            placements.set(candidate.id, 'below');
+            occupied.push(labelBox(candidate, 'below'));
+            continue;
+        }
         const options: LabelPlacement[] = ['below'];
         const free = options.filter((option) => {
             const box = labelBox(candidate, option);
