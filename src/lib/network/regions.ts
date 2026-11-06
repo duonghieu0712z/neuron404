@@ -4,7 +4,22 @@ interface Point {
 }
 
 export function getRegionHull(positions: Point[], padding: number): Point[] {
-    const points = positions
+    if (!positions.length) return [];
+    const center = positions.reduce(
+        (sum, point) => ({
+            x: sum.x + point.x / positions.length,
+            y: sum.y + point.y / positions.length,
+        }),
+        { x: 0, y: 0 },
+    );
+    const radius =
+        Math.max(...positions.map((point) => Math.hypot(point.x - center.x, point.y - center.y))) *
+        0.8;
+    const roundedCore = Array.from({ length: 24 }, (_, index) => {
+        const angle = (index * Math.PI) / 12;
+        return { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
+    });
+    const points = [...positions, ...roundedCore]
         .flatMap((position) =>
             Array.from({ length: 12 }, (_, index) => {
                 const angle = (index * Math.PI) / 6;

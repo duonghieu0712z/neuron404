@@ -88,7 +88,21 @@ export function createNetworkSimulation<Node extends NetworkNode>(
             nodes.flatMap((node) => (node.regions?.length ? node.regions : ['region:unfiled'])),
         ),
     ].sort();
-    const radius = regionIds.length > 1 ? Math.max(260, Math.sqrt(nodes.length) * 65) : 0;
+    const membersByRegion = new Map(
+        regionIds.map((id) => [
+            id,
+            nodes.filter(
+                (node) =>
+                    !node.regionId &&
+                    (node.regions?.length ? node.regions : ['region:unfiled']).includes(id),
+            ),
+        ]),
+    );
+    const orbitByRegion = new Map(
+        regionIds.map((id) => [id, Math.max(120, Math.sqrt(membersByRegion.get(id)!.length) * 42)]),
+    );
+    const spacing = Math.max(...orbitByRegion.values()) * 2 + 340;
+    const radius = regionIds.length > 1 ? spacing / (2 * Math.sin(Math.PI / regionIds.length)) : 0;
     const anchors = new Map(
         regionIds.map((id, index) => {
             const angle = (index * Math.PI * 2) / regionIds.length - Math.PI / 2;
@@ -120,15 +134,8 @@ export function createNetworkSimulation<Node extends NetworkNode>(
     );
     const regionSlots = new Map(
         regionIds.map((id) => {
-            const members = orderRegionMembers(
-                nodes.filter(
-                    (node) =>
-                        !node.regionId &&
-                        (node.regions?.length ? node.regions : ['region:unfiled']).includes(id),
-                ),
-                links,
-            );
-            const orbit = Math.max(120, Math.sqrt(members.length) * 42);
+            const members = orderRegionMembers(membersByRegion.get(id)!, links);
+            const orbit = orbitByRegion.get(id)!;
             return [
                 id,
                 new Map(
@@ -167,7 +174,13 @@ export function createNetworkSimulation<Node extends NetworkNode>(
             forceLink<Node, SimulationLinkDatum<Node>>(links)
                 .id((node) => node.id)
                 .distance(120)
-                .strength(0.6),
+                .strength((link) => {
+                    const source = link.source as Node;
+                    const target = link.target as Node;
+                    return source.regions?.some((id) => target.regions?.includes(id))
+                        ? 0.35
+                        : 0.025;
+                }),
         )
         .force('charge', forceManyBody().strength(-280))
         .force(
@@ -203,8 +216,8 @@ export function createNetworkSimulation<Node extends NetworkNode>(
                         },
                         { x: 0, y: 0 },
                     );
-                    node.vx = (node.vx ?? 0) + (target.x - (node.x ?? 0)) * 0.12 * alpha;
-                    node.vy = (node.vy ?? 0) + (target.y - (node.y ?? 0)) * 0.12 * alpha;
+                    node.vx = (node.vx ?? 0) + (target.x - (node.x ?? 0)) * 0.24 * alpha;
+                    node.vy = (node.vy ?? 0) + (target.y - (node.y ?? 0)) * 0.24 * alpha;
                 }
             }
             for (const [id, center] of regionNodes) {
@@ -260,6 +273,51 @@ export function createNetworkSimulation<Node extends NetworkNode>(
                     source.vy = (source.vy ?? 0) + normalY * push * sourceWeight;
                     target.vx = (target.vx ?? 0) + normalX * push * targetWeight;
                     target.vy = (target.vy ?? 0) + normalY * push * targetWeight;
+                }
+            }
+        })
+        .force('region-separation', (alpha) => {
+            for (let i = 0; i < regionIds.length; i++) {
+                const aId = regionIds[i];
+                const aMembers = membersByRegion.get(aId)!;
+                const a = regionNodes.get(aId) ?? anchors.get(aId)!;
+                for (let j = i + 1; j < regionIds.length; j++) {
+                    const bId = regionIds[j];
+                    const bMembers = membersByRegion.get(bId)!;
+                    if (aMembers.some((node) => regionSlots.get(bId)?.has(node.id))) continue;
+                    const b = regionNodes.get(bId) ?? anchors.get(bId)!;
+                    const extent = (center: { x?: number; y?: number }, members: Node[]) =>
+                        Math.max(
+                            0,
+                            ...members.map((node) =>
+                                Math.hypot(
+                                    (node.x ?? 0) - (center.x ?? 0),
+                                    (node.y ?? 0) - (center.y ?? 0),
+                                ),
+                            ),
+                        );
+                    const dx = (b.x ?? 0) - (a.x ?? 0);
+                    const dy = (b.y ?? 0) - (a.y ?? 0);
+                    const distance = Math.hypot(dx, dy);
+                    const minimum = extent(a, aMembers) + extent(b, bMembers) + 300;
+                    if (distance >= minimum) continue;
+                    const nx = distance > 0.01 ? dx / distance : 1;
+                    const ny = distance > 0.01 ? dy / distance : 0;
+                    const shift = (minimum - distance) * 0.3 * alpha;
+                    for (const [id, members, direction] of [
+                        [aId, aMembers, -1],
+                        [bId, bMembers, 1],
+                    ] as const) {
+                        const center = regionNodes.get(id);
+                        if (center?.fx != null || center?.fy != null) continue;
+                        const target = center ? targets.get(center.id)! : anchors.get(id)!;
+                        target.x += nx * shift * direction;
+                        target.y += ny * shift * direction;
+                        for (const node of center ? [center, ...members] : members) {
+                            node.vx = (node.vx ?? 0) + nx * shift * direction;
+                            node.vy = (node.vy ?? 0) + ny * shift * direction;
+                        }
+                    }
                 }
             }
         })
