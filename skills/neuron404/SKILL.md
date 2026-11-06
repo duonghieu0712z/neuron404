@@ -12,7 +12,7 @@ Use the shared personal knowledge store across projects and conversations. Its f
 Invoke `scripts/neuron404` relative to this skill's actual directory. It follows the installed symlink to this repository and delegates to the existing CLI, independently of the calling project. `NEURON404_HOME` optionally selects a different neuron404 repository. Use the client's discovered skill path, not its current project directory, to locate this launcher.
 
 ```sh
-"/absolute/path/to/skills/neuron404/scripts/neuron404" catalog
+"/absolute/path/to/skills/neuron404/scripts/neuron404" catalog --limit 20
 ```
 
 The launcher requires local shell access, Node.js, pnpm, and an initialized repository database. A missing capability or inaccessible store is a connection failure, not evidence that no knowledge exists. Do not create another store, install dependencies, or change client permissions merely to answer a recall question.
