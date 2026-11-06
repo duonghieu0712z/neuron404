@@ -13,6 +13,8 @@
     import TagsIcon from '@lucide/svelte/icons/tags';
     import WaypointsIcon from '@lucide/svelte/icons/waypoints';
     import { invalidateAll } from '$app/navigation';
+    import { resolve } from '$app/paths';
+    import { page } from '$app/state';
     import Network from 'graphology';
     import { mode } from 'mode-watcher';
     import Sigma, { DEFAULT_DEPTH_LAYERS, DEFAULT_STYLES } from 'sigma';
@@ -48,6 +50,56 @@
     let { data }: PageProps = $props();
 
     const panel = getNeuronPanelContext();
+
+    const networkQuery = $derived(
+        (page.shallow?.url ?? page.url).searchParams.get('q')?.trim() ?? '',
+    );
+    let matchingNodeIds = $state.raw<Set<string> | null>(null);
+    let searching = $state(false);
+    let searchError = $state<string | null>(null);
+    let applyFilter = $state<((ids: Set<string> | null) => void) | null>(null);
+
+    $effect(() => {
+        const query = networkQuery;
+        const nodes = data.nodes;
+        searchError = null;
+        if (!query) {
+            matchingNodeIds = null;
+            searching = false;
+            return;
+        }
+        const controller = new AbortController();
+        matchingNodeIds = new Set();
+        searching = true;
+        void (async () => {
+            try {
+                const response = await fetch(
+                    resolve(`/network/search?q=${encodeURIComponent(query)}`),
+                    { signal: controller.signal },
+                );
+                const result = await response.json();
+                if (!response.ok)
+                    throw new Error(
+                        response.status === 400 ? result.message : 'Search is unavailable.',
+                    );
+                if (
+                    !Array.isArray(result.ids) ||
+                    !result.ids.every((id: unknown) => typeof id === 'string')
+                )
+                    throw new Error('Search is unavailable.');
+                if (controller.signal.aborted) return;
+                const known = new Set(nodes.map((node) => node.id));
+                matchingNodeIds = new Set<string>(result.ids.filter((id: string) => known.has(id)));
+            } catch (cause) {
+                if (controller.signal.aborted) return;
+                matchingNodeIds = null;
+                searchError = cause instanceof Error ? cause.message : 'Search is unavailable.';
+            } finally {
+                if (!controller.signal.aborted) searching = false;
+            }
+        })();
+        return () => controller.abort();
+    });
 
     const NODE_SIZE = 8;
     const LABEL_MAX_LENGTH = 40;
@@ -89,6 +141,13 @@
     const REGION_COLOR = { dark: '#b7c5c0', light: '#506a60' };
 
     let overviewOpen = $state(true);
+    const networkSummary = $derived(
+        [
+            ...(!overviewOpen ? [`${data.regions.length} regions`] : []),
+            `${data.nodes.length} neurons`,
+            `${data.edges.length} synapses`,
+        ].join(' · '),
+    );
     let controlsOpen = $state(true);
     const sections = $state({
         regions: true,
@@ -97,7 +156,6 @@
         nodeColor: true,
         stroke: true,
         edgeColor: true,
-        membership: true,
     });
     const theme = $derived(mode.current === 'dark' ? 'dark' : 'light');
     const groundingCounts = $derived(
@@ -273,10 +331,15 @@
     );
 
     $effect(() => {
+        applyFilter?.(matchingNodeIds);
         const selected = selectedRegionId
             ? getRegionNodeId(selectedRegionId)
             : (panel.selected?.neuron.id ?? null);
-        applyFocus?.(hoveredNode ?? selected, selected);
+        const searchOwnsFocus = networkQuery.length > 0 && !searchError;
+        applyFocus?.(
+            searchOwnsFocus ? hoveredNode : (hoveredNode ?? selected),
+            searchOwnsFocus ? null : selected,
+        );
     });
 
     $effect(() => {
@@ -314,6 +377,13 @@
         let neuronLabelsVisible = true;
         let visibleMembershipMode = untrack(() => membershipMode);
         let neighborhood = new Set<string>();
+        let searchMatches: Set<string> | null = null;
+        const matchesSearch = (id: string) => {
+            const matches = searchMatches;
+            if (!matches) return true;
+            const region = regionByNodeId.get(id);
+            return region ? region.nodeIds.some((member) => matches.has(member)) : matches.has(id);
+        };
         let labelPlacements = new Map<string, LabelPlacement>();
         let signalLabelMasks: ReturnType<typeof labelBox>[] = [];
         const compactLabels: Record<string, string | undefined> = Object.create(null);
@@ -443,6 +513,7 @@
             },
             nodeReducer: (id, attributes, nodeAttributes) => {
                 const expanded = id === activeNode || id === selectedNode;
+                const searchDimmed = !matchesSearch(id) && !expanded;
                 const labelDepth =
                     id === activeNode
                         ? 'hoveredLabels'
@@ -459,17 +530,18 @@
                         labelPosition: 'below',
                         labelDepth,
                         depth: expanded ? labelDepth : 'nodes',
-                        opacity: 1,
+                        opacity: searchDimmed ? 0.2 : 1,
                         backdropArea: 'both',
                         backdropVisibility: expanded ? 'visible' : 'hidden',
                     };
+                if (searchDimmed) return { ...attributes, opacity: 0.2, labelVisibility: 'hidden' };
                 const label = expanded
                     ? nodeAttributes.label
                     : (compactLabels[id] ?? nodeAttributes.shortLabel);
                 const placement = labelPlacements.get(id);
                 const labelVisibility =
                     (neuronLabelsVisible || expanded) && placement ? 'visible' : 'hidden';
-                if (!activeNode)
+                if (searchMatches !== null || !activeNode)
                     return {
                         ...attributes,
                         label,
@@ -492,10 +564,29 @@
                 };
             },
             edgeReducer: (id, attributes) => {
+                const source = network.source(id);
+                const target = network.target(id);
+                if (searchMatches !== null) {
+                    const matched = matchesSearch(source) && matchesSearch(target);
+                    return {
+                        ...getEdgeAppearance(
+                            network.getEdgeAttribute(id, 'color'),
+                            matched ? 0.95 : 0.12,
+                        ),
+                        size: matched ? 2.5 : 1,
+                    };
+                }
+                const connected =
+                    activeNode &&
+                    (regionByNodeId.has(activeNode)
+                        ? neighborhood.has(source) && neighborhood.has(target)
+                        : source === activeNode || target === activeNode);
+                if (!connected && (!matchesSearch(source) || !matchesSearch(target)))
+                    return {
+                        ...getEdgeAppearance(network.getEdgeAttribute(id, 'color'), 0.12),
+                        size: 1,
+                    };
                 if (!activeNode) return attributes;
-                const connected = regionByNodeId.has(activeNode)
-                    ? neighborhood.has(network.source(id)) && neighborhood.has(network.target(id))
-                    : network.source(id) === activeNode || network.target(id) === activeNode;
                 return {
                     ...getEdgeAppearance(
                         network.getEdgeAttribute(id, 'color'),
@@ -537,7 +628,11 @@
                             id === activeNode ||
                             id === selectedNode ||
                             (neuronLabelsVisible &&
-                                (!activeNode || neighborhood.has(id) || id === selectedNode))),
+                                matchesSearch(id) &&
+                                (searchMatches !== null ||
+                                    !activeNode ||
+                                    neighborhood.has(id) ||
+                                    id === selectedNode))),
                 )
                 .map((id) => {
                     const attributes = network.getNodeAttributes(id);
@@ -636,6 +731,8 @@
                 const hull = getRegionHull(points, padding);
                 if (!hull.length) continue;
                 const highlighted = activeNode !== null && members.includes(activeNode);
+                const searchOpacity =
+                    matchesSearch(getRegionNodeId(region.id)) || highlighted ? 1 : 0.25;
                 regionContext.beginPath();
                 const first = hull[0];
                 const last = hull[hull.length - 1];
@@ -652,10 +749,10 @@
                 }
                 regionContext.closePath();
                 regionContext.fillStyle = isDark ? '#a1a1aa' : '#71717a';
-                regionContext.globalAlpha = highlighted ? 0.08 : 0.035;
+                regionContext.globalAlpha = (highlighted ? 0.08 : 0.035) * searchOpacity;
                 regionContext.fill();
                 regionContext.strokeStyle = foreground;
-                regionContext.globalAlpha = highlighted ? 0.45 : 0.18;
+                regionContext.globalAlpha = (highlighted ? 0.45 : 0.18) * searchOpacity;
                 regionContext.lineWidth = highlighted ? 1.5 : 1;
                 regionContext.stroke();
                 regionContext.globalAlpha = 1;
@@ -685,11 +782,12 @@
                 const sourceInset = sigmaInstance.scaleSize(source.size) + 4;
                 const targetInset = sigmaInstance.scaleSize(target.size) + 3;
                 if (distance <= sourceInset + targetInset) continue;
-                regionContext.globalAlpha = link.emphasized
-                    ? 0.6
-                    : activeNode || selectedNode
-                      ? 0.16
-                      : 0.3;
+                const opacity = link.emphasized ? 0.6 : activeNode || selectedNode ? 0.16 : 0.3;
+                regionContext.globalAlpha =
+                    opacity *
+                    (link.emphasized || (matchesSearch(link.source) && matchesSearch(link.target))
+                        ? 1
+                        : 0.2);
                 regionContext.beginPath();
                 regionContext.moveTo(
                     start.x + (dx * sourceInset) / distance,
@@ -714,7 +812,9 @@
                         (regionByNodeId.has(activeNode)
                             ? neighborhood.has(link.sourceId) && neighborhood.has(link.targetId)
                             : link.sourceId === activeNode || link.targetId === activeNode);
-                    return connected
+                    return connected &&
+                        (searchMatches === null ||
+                            (matchesSearch(link.sourceId) && matchesSearch(link.targetId)))
                         ? [
                               {
                                   id: `${link.sourceId}:${link.targetId}:${link.kind}:${index}`,
@@ -749,9 +849,20 @@
             neuronLabelsVisible = visible;
             sigmaInstance.refresh();
         };
+        applyFilter = (ids) => {
+            if (searchMatches === ids) return;
+            searchMatches = ids;
+            sigmaInstance.refresh();
+        };
         applyFocus = (id, selected) => {
-            activeNode = id && network.hasNode(id) ? id : null;
-            selectedNode = selected && network.hasNode(selected) ? selected : null;
+            activeNode =
+                id && network.hasNode(id) && !sigmaInstance.getNodeState(id).isHidden ? id : null;
+            selectedNode =
+                selected &&
+                network.hasNode(selected) &&
+                !sigmaInstance.getNodeState(selected).isHidden
+                    ? selected
+                    : null;
             const region = activeNode ? regionByNodeId.get(activeNode) : undefined;
             neighborhood = new Set(
                 activeNode
@@ -916,6 +1027,7 @@
             stopMotion();
             applyMotion = null;
             applyFocus = null;
+            applyFilter = null;
             applyLabels = null;
             applyMembership = null;
             renderer = null;
@@ -959,6 +1071,7 @@
 <section
     class="network-surface relative h-full min-h-0 overflow-hidden"
     aria-label="Knowledge network"
+    data-neuron-surface
 >
     {#if data.nodes.length === 0}
         <div class="flex h-full items-center justify-center">
@@ -973,6 +1086,17 @@
             class="absolute inset-0"
             aria-label="Interactive neuron network"
         ></div>
+    {/if}
+
+    {#if searchError || searching || (networkQuery && matchingNodeIds?.size === 0)}
+        <div
+            class="pointer-events-none absolute inset-0 flex items-center justify-center p-6"
+            aria-live="polite"
+        >
+            <p class="text-sm text-muted-foreground">
+                {searchError ?? (searching ? 'Searching…' : `No results for "${networkQuery}".`)}
+            </p>
+        </div>
     {/if}
 
     <Card
@@ -992,7 +1116,7 @@
         >
             {#snippet summary()}
                 <span class="mr-3 shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {data.neuronCount} neurons · {data.synapseCount} synapses
+                    {networkSummary}
                 </span>
             {/snippet}
             <CardContent class="flex min-h-0 flex-col gap-2 px-2 pb-3">
@@ -1030,7 +1154,7 @@
                             <div class="space-y-0.5">
                                 <NetworkSection title="Neuron shape" bind:open={sections.shape}>
                                     <div class="space-y-1.5 px-2 py-1.5">
-                                        {@render legendRow('Neuron', data.neuronCount, 'circle')}
+                                        {@render legendRow('Neuron', data.nodes.length, 'circle')}
                                         {@render legendRow(
                                             'Region overview',
                                             data.regions.length,
@@ -1063,8 +1187,14 @@
                                     <div class="space-y-1.5 px-2 py-1.5">
                                         {@render legendRow(
                                             'Solid · all synapses',
-                                            data.synapseCount,
+                                            data.edges.length,
                                             'line',
+                                        )}
+                                        {@render legendRow(
+                                            'Dashed · Region membership',
+                                            membershipCount,
+                                            'dashed',
+                                            REGION_COLOR[theme],
                                         )}
                                     </div>
                                 </NetworkSection>
@@ -1081,19 +1211,6 @@
                                                 SYNAPSE_COLORS[kind][theme],
                                             )}
                                         {/each}
-                                    </div>
-                                </NetworkSection>
-                                <NetworkSection
-                                    title="Region membership"
-                                    bind:open={sections.membership}
-                                >
-                                    <div class="space-y-1.5 px-2 py-1.5">
-                                        {@render legendRow(
-                                            'Dashed · member link',
-                                            membershipCount,
-                                            'dashed',
-                                            REGION_COLOR[theme],
-                                        )}
                                     </div>
                                 </NetworkSection>
                             </div>
@@ -1192,7 +1309,11 @@
                             {/snippet}
                         </TooltipTrigger>
                         <TooltipContent side="left">
-                            Region membership: {membershipLabel} · Next: {nextMembershipMode.label}
+                            Membership: {membershipMode === 'hidden'
+                                ? 'Off'
+                                : membershipMode === 'auto'
+                                  ? 'Auto'
+                                  : 'All'}
                         </TooltipContent>
                     </Tooltip>
                     <Tooltip>

@@ -10,7 +10,7 @@
     <title>{data.neuron.title} · neuron404</title>
 </svelte:head>
 
-<article class="w-full space-y-6 p-6">
+<article class="w-full space-y-6 p-6" data-neuron-surface>
     <h1 class="text-2xl font-semibold">{data.neuron.title}</h1>
 
     <NeuronDetail {data} layout="full" />

@@ -14,6 +14,7 @@
 
     import iconDark from '#lib/assets/icon-dark.svg';
     import iconLight from '#lib/assets/icon-light.svg';
+    import NeuronWorkspace from '#lib/components/neuron-workspace.svelte';
     import { Button } from '#lib/components/ui/button';
     import { Input } from '#lib/components/ui/input';
     import {
@@ -29,26 +30,40 @@
         TooltipProvider,
         TooltipTrigger,
     } from '#lib/components/ui/tooltip';
+    import { createNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
     import './layout.css';
 
     let { children }: LayoutProps = $props();
 
+    createNeuronPanelContext();
+
     const NAV_ITEMS = [
         { href: '/neurons', label: 'Neurons' },
-        { href: '/neurons/network', label: 'Network' },
+        { href: '/network', label: 'Network' },
     ] as const;
 
-    let searchValue = $derived(page.url.searchParams.get('q') ?? '');
+    let searchValue = $derived((page.shallow?.url ?? page.url).searchParams.get('q') ?? '');
     let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
     function searchNeurons(event: Event) {
         searchValue = (event.currentTarget as HTMLInputElement).value;
+        const pathname = page.url.pathname;
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => {
+            if (page.url.pathname !== pathname) return;
             const params = new SvelteURLSearchParams();
             if (searchValue.trim()) params.set('q', searchValue.trim());
             const query = params.toString();
+            if (pathname === resolve('/network')) {
+                void goto(resolve(query ? `/network?${query}` : '/network'), {
+                    shallow: true,
+                    replace: true,
+                    reset: false,
+                    state: page.state,
+                });
+                return;
+            }
             void goto(resolve(query ? `/neurons?${query}` : '/neurons'), {
                 replace: page.url.pathname === '/neurons',
                 reset: false,
@@ -63,7 +78,6 @@
             return (
                 page.url.pathname === '/neurons' ||
                 (page.url.pathname.startsWith('/neurons/') &&
-                    !page.url.pathname.startsWith('/neurons/network') &&
                     !page.url.pathname.startsWith('/neurons/lint') &&
                     !page.url.pathname.startsWith('/neurons/new'))
             );
@@ -171,5 +185,7 @@
 </header>
 
 <main id="main-content" class="h-[calc(100dvh-3.5rem)]">
-    {@render children()}
+    <NeuronWorkspace>
+        {@render children()}
+    </NeuronWorkspace>
 </main>
