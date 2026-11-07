@@ -37,8 +37,7 @@ Requires Node.js >=24 and the pnpm version specified in `package.json`.
 
 ```sh
 pnpm install
-pnpm db:migrate
-pnpm db:index
+pnpm neuron migrate
 pnpm dev
 ```
 
@@ -46,7 +45,7 @@ Open the URL printed by Vite. Local development and Docker share `~/.neuron404`;
 
 ## Using it with AI
 
-Install the CLI with `pnpm add -g @duonghieu0712z/neuron404@latest`, then run `neuron404 migrate`. Install the skill separately from its release archive; see [installation without cloning](docs/installation.md). Downloads require the corresponding release and npm package to be published.
+Install the CLI from the published GitHub Release archive, then run `neuron404 migrate`. Install the skill separately from its release archive; both commands are in [installation without cloning](docs/installation.md). The npm package is not yet published.
 
 The [neuron404 skill](skills/neuron404/SKILL.md) guides an agent through searching, saving, and reviewing knowledge via the CLI. Once configured in the client, use `/neuron404` in Claude or `$neuron404` in Codex, followed by a natural-language request such as “What did we decide about deployment?” or “Save this decision with its rationale.”
 
@@ -63,7 +62,7 @@ neuron404 read NEURON_ID
 Background maintenance is disabled by default. To enable it, select an installed, authenticated CLI explicitly:
 
 ```sh
-NEURON404_MAINTENANCE_PROVIDER=claude pnpm maintenance
+NEURON404_MAINTENANCE_PROVIDER=claude neuron404 maintenance
 ```
 
 Use `codex` to select Codex instead. The worker checks supplied evidence, not independent real-world truth, and does not rewrite neuron bodies or Synapses. See the [maintenance guide](docs/maintenance.md) for reports and limits.

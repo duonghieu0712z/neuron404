@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Correct CLI installation instructions to use the published GitHub Release archive while the npm package is unavailable, and fix the npm publishing workflow's local archive path.
+- Correct first-run development initialization, standalone API commands and healthcheck scope, read-only client token configuration, and release promotion/runtime documentation.
+
 ## [0.1.0] - 2026-11-07
 
 ### Added

@@ -4,7 +4,7 @@
 
 Pull requests and pushes to `main` run Conventional Commit validation and the reusable `quality-checks.yml` workflow. It runs `pnpm format`, `pnpm lint`, release metadata validation, and `pnpm build` (including Svelte/TypeScript checking). Headless packages are built and initialized on Linux, macOS, and Windows. Docker images are built on native Linux amd64/arm64 runners and started with disposable storage to check `/healthz`.
 
-Checks use temporary stores. The same quality workflow gates releases. pnpm comes from `packageManager` in `package.json`; Node.js uses the supported 24 line.
+Checks use temporary stores. The same quality workflow gates releases. pnpm comes from `packageManager` in `package.json`; application and headless CI use Node.js 24. Docker currently builds with Node.js 24 and runs on Node.js 25, as specified in `Dockerfile`.
 
 In repository settings, enable squash merging and auto-merge, allow GitHub Actions to create and approve pull requests, and protect `main` with required checks: `Commit message`, `Code quality / Application quality`, all three `Code quality / Headless (...)` checks, and both `Code quality / Docker (...)` checks. Select the actual check names after the first run. Require branches to be up to date before merging.
 
@@ -37,23 +37,23 @@ Pushing a prerelease tag such as `v0.1.0-beta.2` starts the Release workflow. It
 
 Prereleases get their full version and SHA tags without updating `latest` or a minor-version tag. The GitHub Release is created as a draft from the matching changelog, with an `image.json` asset recording the repository, version, build commit, and multi-platform digest. Keep this receipt: promotion requires it. Review and publish the draft separately. A version whose image already exists is rejected before the publish build, including on reruns; quality jobs may already have run their disposable builds. To deliberately build a new version from scratch, including a stable version with no prerelease, run Release manually on that version tag.
 
-The same release attaches `neuron404-cli-VERSION.tgz`, `neuron404-skill-VERSION.tgz`, and `release-artifacts.json`. The CLI archive is the public `@duonghieu0712z/neuron404` npm package with compiled headless tools, production dependency declarations, migrations and a cross-platform Node entrypoint. The skill archive contains only the skill directory. The receipt records SHA-256 checksums and the build/release commits for both archives. `pnpm build:headless` followed by `pnpm package:release` creates these files locally under ignored `artifacts/` without publishing.
+The same release attaches `neuron404-cli-VERSION.tgz`, `neuron404-skill-VERSION.tgz`, and `release-artifacts.json`. The CLI archive is an npm-installable package named `@duonghieu0712z/neuron404`, with compiled headless tools, production dependency declarations, migrations and a cross-platform Node entrypoint. Attaching it to GitHub does not publish it to the npm registry. The skill archive contains only the skill directory. The receipt records SHA-256 checksums and the build/release commits for both archives. `pnpm build:headless` followed by `pnpm package:release` creates these files locally under ignored `artifacts/` without publishing.
 
 ## Promote a tested prerelease
 
-After testing `0.1.0-beta.2`, prepare the stable release without changing application code:
+For a future version, for example `0.2.0-beta.1` to `0.2.0`, prepare the stable release without changing application code. These are example tags, not existing artifacts; do not reuse the published `v0.1.0` tag.
 
-1. Run `pnpm bump 0.1.0`, add a dated `0.1.0` changelog section describing the promotion, retain the beta history, and update comparison links.
-2. Commit those metadata/documentation changes, create `v0.1.0`, and push the commit and tag. A stable tag does not automatically rebuild an image.
-3. Open **Actions → Promote Release → Run workflow**, select tag `v0.1.0`, and enter `v0.1.0-beta.2` as `source_tag`.
+1. Run `pnpm bump 0.2.0`, prepare a dated `0.2.0` changelog section covering changes since the previous public release, and update comparison links. Private beta logs are not a substitute for the public release notes.
+2. Commit those metadata/documentation changes, create `v0.2.0`, and push the commit and tag. A stable tag does not automatically rebuild an image.
+3. Open **Actions → Promote Release → Run workflow**, select tag `v0.2.0`, and enter the tested `v0.2.0-beta.1` as `source_tag`.
 
 The GitHub CLI equivalent is:
 
 ```sh
-gh workflow run promote.yml --ref v0.1.0 -f source_tag=v0.1.0-beta.2
+gh workflow run promote.yml --ref v0.2.0 -f source_tag=v0.2.0-beta.1
 ```
 
-Promotion verifies the beta receipt against its Git tag, requires the beta commit to be an ancestor of the stable commit, and checks that only `package.json`'s version, `CHANGELOG.md`, `README.md`, or files under `docs/` changed. Changes to dependencies, lockfiles, application code, build scripts, workflows, or other tracked files require a new prerelease build. It then copies the existing multi-platform image index by digest to `0.1.0`, `0.1`, and `latest`, verifying that every destination retains the original digest. It does not install dependencies, run a build, or start containers.
+Promotion verifies the beta receipt against its Git tag, requires the beta commit to be an ancestor of the stable commit, and checks that only `package.json`'s version, `CHANGELOG.md`, `README.md`, or files under `docs/` changed. Changes to dependencies, lockfiles, application code, build scripts, workflows, or other tracked files require a new prerelease build. In this example, it copies the existing multi-platform image index by digest to `0.2.0`, `0.2`, and `latest`, verifying that every destination retains the original digest. It does not install dependencies, run a build, or start containers.
 
 The original image's `package.json`, OCI version/revision labels, provenance, and SBOM remain unchanged. They describe the tested beta build; stable tags describe its approved distribution. Rewriting embedded version metadata would change the digest. The stable draft release and its `image.json` explicitly record the beta source, build version/commit, stable release commit, and unchanged digest. Do not use the embedded package version as the release-channel version.
 
@@ -67,7 +67,7 @@ After the first publish, make the GHCR package public if anonymous pulls are int
 
 Publishing the GitHub Release starts `publish-npm.yml`. It downloads the already packaged CLI and skill archives, verifies their checksums, package/build metadata and release Git tag, then publishes the CLI archive without rebuilding. Prereleases use the npm `beta` tag; stable versions use `latest`. A manual recovery run accepts a published `release_tag`. An identical archive already on npm is skipped after checking its SHA-512 integrity; a different archive at that version is rejected. npm does not allow replacing an existing package version.
 
-The chosen scope is `@duonghieu0712z`; the maintainer must own that npm scope. Bootstrap the first package from the reviewed release archive using an authenticated npm account (`npm publish neuron404-cli-VERSION.tgz --access public --tag beta`). Then configure its npm Trusted Publisher for GitHub owner `duonghieu0712z`, repository `neuron404`, workflow `publish-npm.yml`, allowing direct publishing. Subsequent workflow publishes use OIDC and `id-token: write`, with no stored npm token. The workflow requires npm >=11.5.1, supplied by current Node.js 24 releases. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+The chosen scope is `@duonghieu0712z`; the maintainer must own that npm scope. Bootstrap the first package from the reviewed release archive using an authenticated npm account (`npm publish ./neuron404-cli-VERSION.tgz --access public --tag latest` for a stable version; use `--tag beta` for a prerelease). Then configure its npm Trusted Publisher for GitHub owner `duonghieu0712z`, repository `neuron404`, workflow `publish-npm.yml`, allowing direct publishing. Subsequent workflow publishes use OIDC and `id-token: write`, with no stored npm token. The workflow requires npm >=11.5.1, supplied by current Node.js 24 releases. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
 
 For the first release, bootstrap from the draft's archive before publishing it on GitHub; the workflow recognizes and skips that identical npm package. Configure Trusted Publishing before later versions. If the first workflow instead reports missing authentication, publish the reviewed archive manually, configure npm, and rerun the workflow. Do not rebuild or replace the version to recover authentication setup. Package ownership and Trusted Publisher configuration must be completed on npm; workflow files do not create an npm account or reserve the package name.
 

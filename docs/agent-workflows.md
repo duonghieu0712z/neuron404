@@ -2,7 +2,7 @@
 
 ## Agent commands
 
-Use the installed `neuron404 <command>` CLI. In a source checkout, `pnpm neuron <command>` runs the same services; the repository's `bin/neuron404` can also be called by absolute path from another directory. Ordinary commands use local storage even when `NEURON404_URL` is configured. Use `sync` to exchange data with a remote or `remote <command>` for an explicit direct server operation. See [installation](installation.md) and [remote access](remote-access.md).
+Use the installed `neuron404 <command>` CLI. In a source checkout, `pnpm neuron <command>` runs knowledge and sync commands; use `pnpm maintenance` for the worker and `bin/neuron404 remote <command>` for direct remote access. The repository's shell launcher can also be called by absolute path from another directory. Ordinary commands use local storage even when `NEURON404_URL` is configured. Use `sync` to exchange data with a remote or the installed CLI's `remote <command>` for an explicit direct server operation. See [installation](installation.md) and [remote access](remote-access.md).
 
 ```sh
 neuron404 catalog --query "project" --limit 20

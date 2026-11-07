@@ -84,4 +84,4 @@ jobs:
           if [[ "$version" == *-* ]]; then
             tag=beta
           fi
-          npm publish "artifacts/neuron404-cli-$version.tgz" --access public --tag "$tag" --provenance --ignore-scripts
+          npm publish "./artifacts/neuron404-cli-$version.tgz" --access public --tag "$tag" --provenance --ignore-scripts

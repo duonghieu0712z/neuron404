@@ -61,7 +61,7 @@ neuron404 remote catalog --limit 5
 neuron404 remote search "runtime defaults"
 ```
 
-A copied skill can use `scripts/neuron404 remote <command>` without a local installation; this direct remote mode needs only Node.js >=24. Native Windows can invoke `node <skill-directory>/scripts/remote.mjs <command>`. Direct remote writes do not update the local replica until sync runs. `NEURON404_READ_TOKEN` supports direct reads and pull-only sync; uploading requires the owner token. Failure never switches destinations automatically. HTTP is allowed only on loopback, credentials use headers, and redirects are rejected.
+A copied skill can use `scripts/neuron404 remote <command>` without a local installation; this direct remote mode needs only Node.js >=24. Native Windows can invoke `node <skill-directory>/scripts/remote.mjs <command>`. Direct remote writes do not update the local replica until sync runs. For direct reads or pull-only sync, set the client's `NEURON404_TOKEN` to the server's `NEURON404_READ_TOKEN` value. The client does not read a variable named `NEURON404_READ_TOKEN`. Uploading requires the server's owner token instead. Failure never switches destinations automatically. HTTP is allowed only on loopback, credentials use headers, and redirects are rejected.
 
 ## API and write recovery
 
