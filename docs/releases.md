@@ -33,7 +33,7 @@ Commit reviewed release changes, then create and push the version tag. The tag m
 
 The skill, CLI and web currently share one release version. Build identity is recorded separately so a stable release can reuse tested artifacts.
 
-Pushing a prerelease tag such as `v0.1.0-beta.1` starts the Release workflow. It validates release metadata, runs all quality checks, and publishes `ghcr.io/duonghieu0712z/neuron404` for `linux/amd64` and `linux/arm64`. It uses the workflow's `GITHUB_TOKEN` with `packages: write`; no registry PAT is needed. OCI labels identify the build source, version, and revision; the build includes provenance and SBOM attestations.
+Pushing a prerelease tag such as `v0.1.0-beta.2` starts the Release workflow. It validates release metadata, runs all quality checks, and publishes `ghcr.io/duonghieu0712z/neuron404` for `linux/amd64` and `linux/arm64`. It uses the workflow's `GITHUB_TOKEN` with `packages: write`; no registry PAT is needed. OCI labels identify the build source, version, and revision; the build includes provenance and SBOM attestations.
 
 Prereleases get their full version and SHA tags without updating `latest` or a minor-version tag. The GitHub Release is created as a draft from the matching changelog, with an `image.json` asset recording the repository, version, build commit, and multi-platform digest. Keep this receipt: promotion requires it. Review and publish the draft separately. A version whose image already exists is rejected before the publish build, including on reruns; quality jobs may already have run their disposable builds. To deliberately build a new version from scratch, including a stable version with no prerelease, run Release manually on that version tag.
 
@@ -41,16 +41,16 @@ The same release attaches `neuron404-cli-VERSION.tgz`, `neuron404-skill-VERSION.
 
 ## Promote a tested prerelease
 
-After testing `0.1.0-beta.1`, prepare the stable release without changing application code:
+After testing `0.1.0-beta.2`, prepare the stable release without changing application code:
 
 1. Run `pnpm bump 0.1.0`, add a dated `0.1.0` changelog section describing the promotion, retain the beta history, and update comparison links.
 2. Commit those metadata/documentation changes, create `v0.1.0`, and push the commit and tag. A stable tag does not automatically rebuild an image.
-3. Open **Actions → Promote Release → Run workflow**, select tag `v0.1.0`, and enter `v0.1.0-beta.1` as `source_tag`.
+3. Open **Actions → Promote Release → Run workflow**, select tag `v0.1.0`, and enter `v0.1.0-beta.2` as `source_tag`.
 
 The GitHub CLI equivalent is:
 
 ```sh
-gh workflow run promote.yml --ref v0.1.0 -f source_tag=v0.1.0-beta.1
+gh workflow run promote.yml --ref v0.1.0 -f source_tag=v0.1.0-beta.2
 ```
 
 Promotion verifies the beta receipt against its Git tag, requires the beta commit to be an ancestor of the stable commit, and checks that only `package.json`'s version, `CHANGELOG.md`, `README.md`, or files under `docs/` changed. Changes to dependencies, lockfiles, application code, build scripts, workflows, or other tracked files require a new prerelease build. It then copies the existing multi-platform image index by digest to `0.1.0`, `0.1`, and `latest`, verifying that every destination retains the original digest. It does not install dependencies, run a build, or start containers.

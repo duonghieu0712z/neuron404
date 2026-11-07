@@ -18,7 +18,7 @@ Download and install just the skill archive, without Git cloning, for Claude and
 
 ```sh
 pnpm dlx skills@latest add \
-  https://github.com/duonghieu0712z/neuron404/releases/download/v0.1.0-beta.1/neuron404-skill-0.1.0-beta.1.tgz \
+  https://github.com/duonghieu0712z/neuron404/releases/download/v0.1.0-beta.2/neuron404-skill-0.1.0-beta.2.tgz \
   --skill neuron404 --global --agent claude-code codex
 ```
 
