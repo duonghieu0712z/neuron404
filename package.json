@@ -11,6 +11,8 @@
     },
     "scripts": {
         "build": "run-p type-check \"build-only {@}\" --",
+        "build:headless": "run-s build:headless-runtime package:headless",
+        "build:headless-runtime": "vite build --config vite.headless.config.ts",
         "build:runtime": "vite build --config vite.runtime.config.ts",
         "build:web": "vite build",
         "build-only": "run-s \"build:web {@}\" build:runtime --",
@@ -31,6 +33,7 @@
         "neuron:add": "node --import tsx scripts/add-neuron.ts",
         "neuron:lint": "node --import tsx scripts/lint-neurons.ts",
         "neuron:search": "node --import tsx scripts/search-neurons.ts",
+        "package:headless": "node scripts/package-headless.mjs",
         "prepare": "svelte-kit sync || echo '' && husky",
         "preview": "vite preview",
         "type-check": "pnpm check"

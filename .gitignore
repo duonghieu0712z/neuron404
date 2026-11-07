@@ -37,3 +37,6 @@ vite.config.ts.timestamp-*
 
 # Local archive of development notes migrated from personal neurons
 /.claude/notes/development-neurons/
+
+# Standalone CLI/API distribution
+/headless

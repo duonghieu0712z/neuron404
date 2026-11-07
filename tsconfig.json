@@ -13,6 +13,7 @@
         "scripts",
         "vite.config.ts",
         "vite.runtime.config.ts",
+        "vite.headless.config.ts",
         "prettier.config.ts",
         "eslint.config.ts",
         "drizzle.config.ts",
