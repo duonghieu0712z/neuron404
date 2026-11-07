@@ -6,15 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-## [0.1.0-beta.2] - 2026-11-07
-
 ### Changed
 
-- Require every commit, including documentation, CI, dependency, and refactoring changes, to include its corresponding changelog update.
+- Reorganize installation, CLI, storage, maintenance, and release documentation; remove internal agent notes and duplicated setup instructions from user guides ([8b53414](https://github.com/duonghieu0712z/neuron404/commit/8b534146e3668d90c517e73be6c519601d1d83bf)).
+
+## [0.1.0-beta.2] - 2026-11-07
 
 ### Fixed
 
-- Normalize Windows paths before adding the installed CLI to Git Bash's `PATH`, and check the native PowerShell command shim during release validation.
+- Normalize Windows paths before adding the installed CLI to Git Bash's `PATH`, and check the native PowerShell command shim during release validation ([be60717](https://github.com/duonghieu0712z/neuron404/commit/be60717999209febfe50ebf6eb0c8ee7204c2474)).
 
 ## [0.1.0-beta.1] - 2026-11-07
 

@@ -12,7 +12,7 @@ neuron404 migrate
 neuron404 catalog
 ```
 
-Use `@latest` after the first stable package exists, or specify an exact version. npm global installation is also supported. If pnpm reports that its global executable directory is missing, run `pnpm setup` and reopen the terminal. The CLI stores knowledge in `~/.neuron404`; upgrades do not replace it. No server starts during installation or ordinary commands. See [headless installation](headless.md) for direct archive installation and API hosting.
+Use `@latest` after the first stable package exists, or specify an exact version. npm global installation is also supported. Alternatively, download `neuron404-cli-VERSION.tgz` from a GitHub Release and run `pnpm add -g ./neuron404-cli-VERSION.tgz`; production dependencies still need a registry connection. If pnpm reports that its global executable directory is missing, run `pnpm setup` and reopen the terminal. The CLI stores knowledge in `~/.neuron404`; upgrades do not replace it. No server starts during installation or ordinary commands. See [headless installation](headless.md) for direct archive installation and API hosting.
 
 Download and install just the skill archive, without Git cloning, for Claude and Codex:
 
@@ -36,4 +36,4 @@ Local-first operation and sync still require the CLI. Configuring a remote does 
 
 Update the CLI by installing the selected npm tag or exact version again. To update a skill pinned to a release archive, run the skill installation command with the new release URL. Keep a versioned URL for reproducibility; it does not automatically follow newer releases.
 
-Keep the skill, CLI and web on the same release version for the current distribution. This shared version keeps installation and updates simple; command/API and sync protocol compatibility remain necessary. Promoted images retain their original build metadata; stable CLI packages have a stable package version and retain the original build identity in `build.json`. Build identity is separate from the shared release version.
+Use matching release versions for the skill, CLI and web. See [releases](releases.md) for build identity and prerelease promotion.
