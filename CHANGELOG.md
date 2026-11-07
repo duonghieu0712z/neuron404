@@ -8,8 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- Correct CLI installation instructions to use the published GitHub Release archive while the npm package is unavailable, and fix the npm publishing workflow's local archive path.
-- Correct first-run development initialization, standalone API commands and healthcheck scope, read-only client token configuration, and release promotion/runtime documentation.
+- Correct CLI installation instructions to use the published GitHub Release archive while the npm package is unavailable, and fix the npm publishing workflow's local archive path. ([7d6276e](https://github.com/duonghieu0712z/neuron404/commit/7d6276e9cc17e9ed2b4d601b328fec35f80a1251))
+- Correct first-run development initialization, standalone API commands and healthcheck scope, read-only client token configuration, and release promotion/runtime documentation. ([7d6276e](https://github.com/duonghieu0712z/neuron404/commit/7d6276e9cc17e9ed2b4d601b328fec35f80a1251))
 
 ## [0.1.0] - 2026-11-07
 
