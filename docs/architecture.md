@@ -1,28 +1,43 @@
 # Architecture and storage
 
-## Terminology
+## Knowledge model
 
-**Neuron** is a knowledge unit, **Synapse** is a semantic relationship, **Region** groups neurons by knowledge context, and **Network** is the exploration view. Region membership does not require synapses. These names are neuroscience-inspired product metaphors, not a biological simulation. Use neuroscience terminology consistently for new product concepts. Region membership uses `regions` throughout the schema, frontmatter, catalog, and CLI; search uses `--region`.
+A **Neuron** is a knowledge unit, a **Synapse** is a typed semantic relationship, a **Region** groups neurons, and the **Network** visualizes their connections. A neuron can belong to several Regions or have no Synapses. Region membership is metadata, not a semantic relationship. These names are product metaphors rather than a biological simulation.
 
-## Storage
+Markdown holds authoritative knowledge; SQLite is a derived search index. The web application, CLI and remote API use the same storage services, revision checks and history.
 
-- `content/neurons/<id>.md`: current neuron bodies and frontmatter; authoritative knowledge.
-- `content/sources/<sha256>.json`: immutable evidence snapshots with source URI, optional locator, and capture time.
-- `content/history/<id>/<revision>.md`: exact original and subsequent versions saved by updates.
-- `content/operations.jsonl`: append-only write receipts with current and previous revisions.
-- `content/regions.json`: Region definitions; membership is neuron metadata.
-- `content/regions/<id>.md`: authored Region overviews with supporting neuron revisions and links.
-- `content/history/region-overviews/<id>/<revision>.md`: preserved Region article revisions.
-- `content/history/regions/<revision>.json`: exact catalog snapshots before adding Regions.
-- `content/history/storage-migrations/regions.json`: migration receipt with exact files before and after the terminology change.
-- SQLite: derived neuron, relation, and full-text indexes. Rebuild from Markdown with `pnpm neuron index --rebuild`.
+## Data layout
 
-Personal content and databases are ignored by Git. Application Git history is not a backup of personal knowledge. Keep private backups of the content directory; rebuilding SQLite cannot recreate lost source files or neuron revisions.
+The default root is `~/.neuron404`. Docker mounts that directory at `/data`; `NEURON404_DATA_DIR` can override the root for another deployment location.
 
-Local web and CLI commands derive the data directory from the operating system home directory: `~/.neuron404`. SQLite is always `neuron404.db` and knowledge files are under `content/` in that directory. No path configuration is required. Docker sets `NEURON404_DATA_DIR=/data` internally to use its bind mount; this optional root override also supports other deployment locations.
+| Path under the data root        | Contents                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------- |
+| `content/neurons/<id>.md`       | Current neuron frontmatter and body                                             |
+| `content/sources/<sha256>.json` | Immutable evidence snapshots with source URI and capture metadata               |
+| `content/regions.json`          | Region definitions                                                              |
+| `content/regions/<id>.md`       | Authored Region overviews and supporting revisions                              |
+| `content/history/`              | Exact prior neuron, overview and catalog revisions, including migration history |
+| `content/operations.jsonl`      | Append-only write receipts                                                      |
+| `neuron404.db`                  | Derived indexes and database migration state                                    |
+| `maintenance/`                  | Worker state, reports and events                                                |
+| `sync/`                         | Remote checkpoints and unavailable-reference metadata                           |
 
-Existing Markdown remains valid without aliases, structured sources, or lifecycle fields. Its default lifecycle is `active`, which does not imply verified or current knowledge. The storage refactor does not rewrite legacy bodies, invent source snapshots, or infer replacements.
+Writes use a cross-process lock, atomic file replacement and content-hash optimistic concurrency. Updates preserve previous file bytes. Older neurons without lifecycle metadata default to `active`; that status does not imply verification. See [CLI operations and recovery](agent-workflows.md).
 
-Network renders actual neurons and typed synapses. Regions define labeled background areas and layout forces that keep members near one another, including isolated neurons. A neuron can belong to multiple regions. Each Region has a draggable, point-top hexagon at the center of its member layout. It opens the authored overview in the sidebar, influences its members when dragged, and always shows its full label, including when ordinary neuron labels are hidden. These are visual metadata markers, excluded from neuron and synapse counts; no membership edges or synthetic knowledge are stored. Grouping does not create semantic relationships. Hovering or selecting a neuron shows traveling pulses along its actual synapses in their stored source-to-target direction. Small pulses render above the lines in matching colors; focused dashed membership lines use the same effect. Pulses stop when motion is paused or the tab is hidden, and respect reduced-motion preferences. A separate dashed overlay can show Region membership: Hidden, Automatic (hover/selection), or Show all. An icon button cycles through the three modes; its tooltip names the current mode. The default is Automatic and the choice is saved in the browser. These lines have no arrows, render behind synapses, and do not affect counts, neighbor relationships, or layout forces.
+Application Git history does not contain personal data. Back up the full data root; rebuilding SQLite cannot restore lost Markdown, source snapshots or history. See [deployment](deployment.md).
 
-The Network lives at `/network`; the former `/neurons/network` URL redirects there. Header search on Network emphasizes matches in place using the same indexed prefix matching as the Neurons list. Unrelated neurons and their connections fade, as they do during hover; all nodes, layout positions and totals remain present. While a query is active, search emphasis takes priority over the selection retained in the sidebar. Clearing search restores emphasis around the selected neuron and its connections. In Network discussions, hiding unrelated neurons means fading them rather than removing them from view. The shared detail sidebar keeps its selection across these views; background clicks inside their content surfaces dismiss it, while header and control interactions preserve it.
+## Indexing and retrieval
+
+Search uses SQLite full-text indexes; it does not require embeddings or a model call. Region catalogs and neuron summaries allow callers to narrow the scope before loading bodies.
+
+CLI writes update the index immediately. A persisted checkpoint tracks file stamps and revisions. External edits are reconciled on subsequent queries after 30 seconds, or earlier when directory/catalog changes or a dirty marker are detected. Reconciliation parses changed files; reading a selected neuron verifies its actual content hash. `neuron404 index` synchronizes immediately, while `neuron404 index --rebuild` reparses the store. Markdown remains authoritative throughout.
+
+## Network
+
+The `/network` view renders real neurons and typed Synapses with WebGL. Region boundaries group related members; a draggable hexagonal marker opens each Region's overview. These metadata markers and optional dashed membership lines are excluded from neuron/Synapse counts and do not create stored relationships.
+
+Search, hover and selection emphasize relevant neurons while fading unrelated content. Search takes priority over the sidebar selection until cleared. The sidebar retains selection when switching between Neurons and Network. Motion and display controls are saved in the browser; motion respects reduced-motion preferences.
+
+## Maintenance integrations
+
+The optional maintenance worker schedules evidence audits and Region overview generation. Agent adapters prepare executable arguments, input and output parsing; the shared runner controls timeouts, cancellation, output limits and schema validation. Adapters implement `MaintenanceAgentAdapter` in `src/lib/server/maintenance/agents/types.ts` and register in `agents/index.ts`. Registering an adapter does not enable it. See [maintenance](maintenance.md) for configuration and report handling.

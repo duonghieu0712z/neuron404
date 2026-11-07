@@ -2,20 +2,7 @@
 
 The web UI is optional. A headless distribution includes the local CLI, maintenance CLI, migrations, skill and an authenticated API server. It excludes SvelteKit's web build and does not start a server for ordinary local commands. Its data directory is still `~/.neuron404`.
 
-## Install without cloning
-
-After the CLI has been published, install Node.js >=24 and run:
-
-```sh
-pnpm add -g @duonghieu0712z/neuron404@beta
-neuron404 --version
-neuron404 migrate
-neuron404 catalog
-```
-
-Use `@latest` after the first stable package is published. `npm install -g` is also supported. The package includes compiled JavaScript, production dependency declarations, migrations and the skill; it contains no web UI or personal data. Installing does not initialize storage or start a server. These commands use the package manager's native launcher on Windows, Linux and macOS. CI is configured to check those platforms; only macOS has been checked locally.
-
-To install without using the npm registry, download `neuron404-cli-VERSION.tgz` from a GitHub Release and run `pnpm add -g ./neuron404-cli-VERSION.tgz`; production dependencies still need a registry connection. Downloaded archives and checksums are also used by the release pipeline. See [skill installation](installation.md) for agent setup.
+For CLI and skill installation from npm or release archives, follow [installation](installation.md). This page covers building a standalone distribution and hosting the API without a website.
 
 ## Build from source
 
@@ -38,17 +25,7 @@ No web interface is installed in this directory. `node bin/neuron404.mjs` provid
 
 `build:headless` replaces the repository's `dist/` output; run `pnpm build` again before using the web production server. Copy the complete generated `headless/` distribution rather than mixing outputs from the two builds.
 
-## Local use and optional sync
-
-All ordinary commands stay local. To exchange knowledge with a remote server:
-
-```sh
-export NEURON404_URL="https://neuron.example.com"
-export NEURON404_TOKEN="YOUR_ACCESS_TOKEN"
-neuron404 sync
-```
-
-See [remote access](remote-access.md) for conflict handling, data scope and first-sync authorization. Sync is explicit; configuring a remote does not prevent offline saves or automatically upload knowledge.
+Ordinary commands use local storage. Optional synchronization is described in [remote access](remote-access.md).
 
 ## API without a website
 

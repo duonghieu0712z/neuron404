@@ -81,7 +81,7 @@ pnpm format
 pnpm build
 ```
 
-Run `pnpm neuron:lint` when changing stored knowledge. The retrieval design is still evolving; long-term effectiveness as the store grows remains to be evaluated.
+Run `pnpm neuron:lint` when changing stored knowledge.
 
 ## Further documentation
 
