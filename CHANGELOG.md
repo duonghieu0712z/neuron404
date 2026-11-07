@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.1.0-beta.2] - 2026-11-07
 
+### Changed
+
+- Require every commit, including documentation, CI, dependency, and refactoring changes, to include its corresponding changelog update.
+
 ### Fixed
 
 - Normalize Windows paths before adding the installed CLI to Git Bash's `PATH`, and check the native PowerShell command shim during release validation.

@@ -18,7 +18,7 @@ Following the Kazmas workflow, minor and patch Dependabot PRs are approved and q
 
 Use `0.x` while the public CLI/API and storage contracts are evolving. Use patch releases for compatible fixes and minor releases for substantial features or incompatible changes during this phase. Describe compatibility changes and required migration steps explicitly.
 
-Add user-facing changes under `[Unreleased]` in `CHANGELOG.md`, using the applicable Keep a Changelog sections. Before release:
+Every commit must include a corresponding `CHANGELOG.md` update in that same commit. This includes application code, fixes, documentation, CI, dependencies, packaging, and refactoring. Keep entries concise and describe the final change rather than copying the Git log. Normal commits add entries under `[Unreleased]` using the applicable Keep a Changelog sections; release preparation commits finalize the dated version section and comparison links. Before release:
 
 ```sh
 pnpm bump 0.2.0
