@@ -67,7 +67,7 @@
         "@types/sanitize-html": "^2.16.2",
         "bits-ui": "^2.20.4",
         "cn": "^0.5.2",
-        "d3-force": "3.0.0",
+        "d3-force": "3.0.1",
         "drizzle-kit": "^0.31.11",
         "eslint": "^10.14.0",
         "eslint-config-prettier": "^10.1.8",
