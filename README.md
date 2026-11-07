@@ -27,7 +27,7 @@ docker compose up -d
 
 Open [localhost:3000/neurons](http://localhost:3000/neurons). Compose uses the published `ghcr.io/duonghieu0712z/neuron404` image and names the container `neuron404`. Startup applies migrations and synchronizes the index; a new data directory starts empty. Published images become available after the first release workflow succeeds.
 
-Set `NEURON404_VERSION` to pin a release (for example `0.1.0-beta.2` before the first stable image), or build from source with `docker compose -f compose.yaml -f compose.build.yaml up -d --build`.
+Set `NEURON404_VERSION` to pin a release (for example `0.1.0`), or build from source with `docker compose -f compose.yaml -f compose.build.yaml up -d --build`.
 
 Set `NEURON404_PORT` to change the host port. If your UID/GID differs from 1000, set `NEURON404_UID` and `NEURON404_GID` in `.env` before starting Compose; see [.env.example](.env.example). Health checks use `/healthz`.
 
@@ -46,7 +46,7 @@ Open the URL printed by Vite. Local development and Docker share `~/.neuron404`;
 
 ## Using it with AI
 
-Install the CLI with `pnpm add -g @duonghieu0712z/neuron404@beta`, then run `neuron404 migrate`. Install the skill separately from its release archive; see [installation without cloning](docs/installation.md). These downloads become available after publishing the first release and npm package.
+Install the CLI with `pnpm add -g @duonghieu0712z/neuron404@latest`, then run `neuron404 migrate`. Install the skill separately from its release archive; see [installation without cloning](docs/installation.md). Downloads require the corresponding release and npm package to be published.
 
 The [neuron404 skill](skills/neuron404/SKILL.md) guides an agent through searching, saving, and reviewing knowledge via the CLI. Once configured in the client, use `/neuron404` in Claude or `$neuron404` in Codex, followed by a natural-language request such as “What did we decide about deployment?” or “Save this decision with its rationale.”
 

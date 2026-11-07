@@ -7,18 +7,18 @@ Node.js >=24 is required. Neither the CLI nor the skill needs a repository clone
 Install the CLI and initialize the local store:
 
 ```sh
-pnpm add -g @duonghieu0712z/neuron404@beta
+pnpm add -g @duonghieu0712z/neuron404@latest
 neuron404 migrate
 neuron404 catalog
 ```
 
-Use `@latest` after the first stable package exists, or specify an exact version. npm global installation is also supported. Alternatively, download `neuron404-cli-VERSION.tgz` from a GitHub Release and run `pnpm add -g ./neuron404-cli-VERSION.tgz`; production dependencies still need a registry connection. If pnpm reports that its global executable directory is missing, run `pnpm setup` and reopen the terminal. The CLI stores knowledge in `~/.neuron404`; upgrades do not replace it. No server starts during installation or ordinary commands. See [headless installation](headless.md) for direct archive installation and API hosting.
+Use `@beta` for prereleases, or specify an exact version such as `@0.1.0`. npm global installation is also supported. Alternatively, download `neuron404-cli-VERSION.tgz` from a GitHub Release and run `pnpm add -g ./neuron404-cli-VERSION.tgz`; production dependencies still need a registry connection. If pnpm reports that its global executable directory is missing, run `pnpm setup` and reopen the terminal. The CLI stores knowledge in `~/.neuron404`; upgrades do not replace it. No server starts during installation or ordinary commands. See [headless installation](headless.md) for direct archive installation and API hosting.
 
 Download and install just the skill archive, without Git cloning, for Claude and Codex:
 
 ```sh
 pnpm dlx skills@latest add \
-  https://github.com/duonghieu0712z/neuron404/releases/download/v0.1.0-beta.2/neuron404-skill-0.1.0-beta.2.tgz \
+  https://github.com/duonghieu0712z/neuron404/releases/download/v0.1.0/neuron404-skill-0.1.0.tgz \
   --skill neuron404 --global --agent claude-code codex
 ```
 

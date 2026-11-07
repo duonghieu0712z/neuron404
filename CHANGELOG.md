@@ -6,30 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Changed
-
-- Reorganize installation, CLI, storage, maintenance, and release documentation; remove internal agent notes and duplicated setup instructions from user guides ([8b53414](https://github.com/duonghieu0712z/neuron404/commit/8b534146e3668d90c517e73be6c519601d1d83bf)).
-
-## [0.1.0-beta.2] - 2026-11-07
-
-### Fixed
-
-- Normalize Windows paths before adding the installed CLI to Git Bash's `PATH`, and check the native PowerShell command shim during release validation ([be60717](https://github.com/duonghieu0712z/neuron404/commit/be60717999209febfe50ebf6eb0c8ee7204c2474)).
-
-## [0.1.0-beta.1] - 2026-11-07
+## [0.1.0] - 2026-11-07
 
 ### Added
 
-- Initial release baseline for local-first knowledge storage using Markdown Neurons, typed Synapses, and Regions, with a derived SQLite search index.
-- Source snapshots, revision history, evidence-aware retrieval, and revision-checked writes through the CLI and shared Claude/Codex skill.
-- Neuron browsing and an interactive Network with Region overviews, search emphasis, draggable neurons, and configurable motion and labels.
-- Optional background maintenance through an explicitly selected Claude or Codex CLI.
-- Authenticated remote API and web sessions, plus optional synchronization with direction, Region selection, dry runs, and conflict preservation.
-- Standalone headless CLI/API distribution for installations without the web interface.
-- Publishable CLI package, standalone skill archives, and checksum receipts for installation without cloning the repository; stable promotion reuses compiled CLI code and the tested skill archive.
-- Container packaging with persistent storage under `~/.neuron404`, automatic initialization, and a `/healthz` endpoint.
-- GitHub quality checks, weekly Dependabot updates, and version-tagged multi-platform GHCR publishing with changelog-based release drafts and promotion of tested prerelease images without rebuilding.
+- Local-first knowledge storage using Markdown Neurons, typed Synapses, and Regions, with a derived SQLite index and a shared data directory at `~/.neuron404`.
+- Immutable source snapshots, exact revision history, write receipts, atomic file updates, and revision-checked concurrent writes that preserve existing knowledge.
+- Knowledge metadata for aliases, grounding, endorsement, provenance, and active/superseded/retracted lifecycle states, with caution and replacement context returned during retrieval.
+- Ranked full-text and token-prefix search, Region filters, paginated catalogs and neighbors, retrieval cues, and incremental indexing of external Markdown edits.
+- Agent-driven ingestion with automatic Region classification and versioned Region overview articles backed by member revisions and citations.
+- A web interface for creating and browsing Neurons grouped by Region, with light/dark themes, Markdown rendering, evidence reports, and a shared detail sidebar.
+- An interactive WebGL Network with draggable neurons and Region overview markers, grouped layouts, zoom and fit-to-view controls, search emphasis, configurable labels and motion, collapsible panels, and animated Synapse signals.
+- A shared Claude/Codex skill supporting natural-language search, save, ingest, review, and sync requests; invocation without a request proposes useful knowledge from the current conversation without saving automatically.
+- Optional background maintenance through explicitly selected Claude or Codex CLIs, including source-evidence audits, checked Region overviews, persisted findings, and configurable request/retry limits. Maintenance is disabled by default.
+- Authenticated remote API access and browser sessions, separate owner/read tokens, HTTPS proxy support, and idempotent write recovery. Cloudflare integration is optional.
+- Optional local/remote synchronization with push, pull, or both directions, Region selection, dry-run previews, hash-based change detection, conflict preservation, and deferred resolution of references outside a partial replica.
+- A standalone headless CLI/API distribution, an installable `@duonghieu0712z/neuron404` package, and separate skill archives for installation without cloning the repository or installing the web UI. CLI launchers support Windows, Linux, and macOS.
+- Production Docker packaging with persistent data mounts, automatic storage initialization, a dedicated `/healthz` endpoint, minified builds without application source maps, and a separate Compose override for local source builds.
+- GitHub quality gates, weekly grouped Dependabot updates, multi-platform GHCR publishing, checksum-protected CLI/skill artifacts, npm trusted-publishing automation, and promotion of tested images without rebuilding.
+- Installation, CLI, storage, maintenance, deployment, and release guides, with consistent Neuron/Synapse/Region/Network terminology.
 
-[Unreleased]: https://github.com/duonghieu0712z/neuron404/compare/v0.1.0-beta.2...HEAD
-[0.1.0-beta.2]: https://github.com/duonghieu0712z/neuron404/compare/v0.1.0-beta.1...v0.1.0-beta.2
-[0.1.0-beta.1]: https://github.com/duonghieu0712z/neuron404/releases/tag/v0.1.0-beta.1
+[Unreleased]: https://github.com/duonghieu0712z/neuron404/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/duonghieu0712z/neuron404/releases/tag/v0.1.0
