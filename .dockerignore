@@ -15,3 +15,8 @@
 !bin/**
 !drizzle/
 !drizzle/**
+!skills/
+!skills/neuron404/
+!skills/neuron404/scripts/
+!skills/neuron404/scripts/transport.mjs
+!skills/neuron404/scripts/transport.d.mts
