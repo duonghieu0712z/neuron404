@@ -4,7 +4,7 @@
 
 Pull requests and pushes to `main` run Conventional Commit validation and the reusable `quality-checks.yml` workflow. It runs `pnpm format`, `pnpm lint`, release metadata validation, and `pnpm build` (including Svelte/TypeScript checking). Headless packages are built and initialized on Linux, macOS, and Windows. Docker images are built on native Linux amd64/arm64 runners and started with disposable storage to check `/healthz`.
 
-Checks use temporary stores, not personal knowledge. No test runner is required. The same quality workflow gates releases. pnpm comes from `packageManager` in `package.json`; Node.js uses the supported 24 line.
+Checks use temporary stores. The same quality workflow gates releases. pnpm comes from `packageManager` in `package.json`; Node.js uses the supported 24 line.
 
 In repository settings, enable squash merging and auto-merge, allow GitHub Actions to create and approve pull requests, and protect `main` with required checks: `Commit message`, `Code quality / Application quality`, all three `Code quality / Headless (...)` checks, and both `Code quality / Docker (...)` checks. Select the actual check names after the first run. Require branches to be up to date before merging.
 
@@ -12,20 +12,20 @@ In repository settings, enable squash merging and auto-merge, allow GitHub Actio
 
 Dependabot checks npm/pnpm, Docker, and GitHub Actions every Monday on staggered schedules. npm updates increase declared version requirements. Minor and patch updates are grouped per ecosystem; major updates remain separate.
 
-Following the Kazmas workflow, minor and patch Dependabot PRs are approved and queued for squash auto-merge only after commit and quality checks pass. The merge request is tied to the checked head commit. Major updates require manual review. Workflows use `pull_request`, not privileged execution of PR code through `pull_request_target`.
+Minor and patch Dependabot PRs are approved and queued for squash auto-merge only after commit and quality checks pass. The merge request is tied to the checked head commit. Major updates require manual review. Workflows use `pull_request`, not privileged execution of PR code through `pull_request_target`.
 
 ## Prepare a version
 
 Use `0.x` while the public CLI/API and storage contracts are evolving. Use patch releases for compatible fixes and minor releases for substantial features or incompatible changes during this phase. Describe compatibility changes and required migration steps explicitly.
 
-Add user-facing changes under `[Unreleased]` in `CHANGELOG.md`, using the applicable Keep a Changelog sections. Before release:
+Prepare `CHANGELOG.md` using the applicable Keep a Changelog sections. Before release:
 
 ```sh
 pnpm bump 0.2.0
 pnpm release:check
 ```
 
-Between those commands, move the accumulated changes into a dated `## [0.2.0] - YYYY-MM-DD` section, retain an empty `[Unreleased]` section, and update comparison links. The bump command only changes `package.json`. `release:check` requires a valid matching version, date, and nonempty changelog. Do not reconstruct fictitious releases from old commits; `0.1.0-beta.1` is the initial baseline.
+Between those commands, move the accumulated changes into a dated `## [0.2.0] - YYYY-MM-DD` section, retain an empty `[Unreleased]` section, and update comparison links. The bump command only changes `package.json`. `release:check` requires a valid matching version, date, and nonempty changelog.
 
 Commit reviewed release changes, then create and push the version tag. The tag must match `package.json` and its changelog section. Released versions and their tags must not be moved or reused for different source. A manual workflow must select an existing version tag, not a branch.
 
@@ -33,7 +33,7 @@ Commit reviewed release changes, then create and push the version tag. The tag m
 
 The skill, CLI and web currently share one release version. Build identity is recorded separately so a stable release can reuse tested artifacts.
 
-Pushing a prerelease tag such as `v0.1.0-beta.1` starts the Release workflow. It validates release metadata, runs all quality checks, and publishes `ghcr.io/duonghieu0712z/neuron404` for `linux/amd64` and `linux/arm64`. It uses the workflow's `GITHUB_TOKEN` with `packages: write`; no registry PAT is needed. OCI labels identify the build source, version, and revision; the build includes provenance and SBOM attestations.
+Pushing a prerelease tag such as `v0.1.0-beta.2` starts the Release workflow. It validates release metadata, runs all quality checks, and publishes `ghcr.io/duonghieu0712z/neuron404` for `linux/amd64` and `linux/arm64`. It uses the workflow's `GITHUB_TOKEN` with `packages: write`; no registry PAT is needed. OCI labels identify the build source, version, and revision; the build includes provenance and SBOM attestations.
 
 Prereleases get their full version and SHA tags without updating `latest` or a minor-version tag. The GitHub Release is created as a draft from the matching changelog, with an `image.json` asset recording the repository, version, build commit, and multi-platform digest. Keep this receipt: promotion requires it. Review and publish the draft separately. A version whose image already exists is rejected before the publish build, including on reruns; quality jobs may already have run their disposable builds. To deliberately build a new version from scratch, including a stable version with no prerelease, run Release manually on that version tag.
 
@@ -41,16 +41,16 @@ The same release attaches `neuron404-cli-VERSION.tgz`, `neuron404-skill-VERSION.
 
 ## Promote a tested prerelease
 
-After testing `0.1.0-beta.1`, prepare the stable release without changing application code:
+After testing `0.1.0-beta.2`, prepare the stable release without changing application code:
 
 1. Run `pnpm bump 0.1.0`, add a dated `0.1.0` changelog section describing the promotion, retain the beta history, and update comparison links.
 2. Commit those metadata/documentation changes, create `v0.1.0`, and push the commit and tag. A stable tag does not automatically rebuild an image.
-3. Open **Actions → Promote Release → Run workflow**, select tag `v0.1.0`, and enter `v0.1.0-beta.1` as `source_tag`.
+3. Open **Actions → Promote Release → Run workflow**, select tag `v0.1.0`, and enter `v0.1.0-beta.2` as `source_tag`.
 
 The GitHub CLI equivalent is:
 
 ```sh
-gh workflow run promote.yml --ref v0.1.0 -f source_tag=v0.1.0-beta.1
+gh workflow run promote.yml --ref v0.1.0 -f source_tag=v0.1.0-beta.2
 ```
 
 Promotion verifies the beta receipt against its Git tag, requires the beta commit to be an ancestor of the stable commit, and checks that only `package.json`'s version, `CHANGELOG.md`, `README.md`, or files under `docs/` changed. Changes to dependencies, lockfiles, application code, build scripts, workflows, or other tracked files require a new prerelease build. It then copies the existing multi-platform image index by digest to `0.1.0`, `0.1`, and `latest`, verifying that every destination retains the original digest. It does not install dependencies, run a build, or start containers.
@@ -71,6 +71,4 @@ The chosen scope is `@duonghieu0712z`; the maintainer must own that npm scope. B
 
 For the first release, bootstrap from the draft's archive before publishing it on GitHub; the workflow recognizes and skips that identical npm package. Configure Trusted Publishing before later versions. If the first workflow instead reports missing authentication, publish the reviewed archive manually, configure npm, and rerun the workflow. Do not rebuild or replace the version to recover authentication setup. Package ownership and Trusted Publisher configuration must be completed on npm; workflow files do not create an npm account or reserve the package name.
 
-## Run a published image
-
-Use the repository's `compose.yaml`, set `NEURON404_VERSION` to the desired release, then run `docker compose pull` and `docker compose up -d`. Without an override, Compose uses `latest`. Back up `~/.neuron404` before upgrading: restoring an older image does not undo data migrations. See [deployment](deployment.md) for permissions, source builds, and recovery.
+For running published images, source builds and upgrade backups, see [deployment](deployment.md).

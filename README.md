@@ -27,7 +27,7 @@ docker compose up -d
 
 Open [localhost:3000/neurons](http://localhost:3000/neurons). Compose uses the published `ghcr.io/duonghieu0712z/neuron404` image and names the container `neuron404`. Startup applies migrations and synchronizes the index; a new data directory starts empty. Published images become available after the first release workflow succeeds.
 
-Set `NEURON404_VERSION` to pin a release (for example `0.1.0-beta.1` before the first stable image), or build from source with `docker compose -f compose.yaml -f compose.build.yaml up -d --build`.
+Set `NEURON404_VERSION` to pin a release (for example `0.1.0-beta.2` before the first stable image), or build from source with `docker compose -f compose.yaml -f compose.build.yaml up -d --build`.
 
 Set `NEURON404_PORT` to change the host port. If your UID/GID differs from 1000, set `NEURON404_UID` and `NEURON404_GID` in `.env` before starting Compose; see [.env.example](.env.example). Health checks use `/healthz`.
 
@@ -81,7 +81,7 @@ pnpm format
 pnpm build
 ```
 
-Run `pnpm neuron:lint` when changing stored knowledge. The retrieval design is still evolving; long-term effectiveness as the store grows remains to be evaluated.
+Run `pnpm neuron:lint` when changing stored knowledge.
 
 ## Further documentation
 

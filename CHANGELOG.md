@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Reorganize installation, CLI, storage, maintenance, and release documentation; remove internal agent notes and duplicated setup instructions from user guides ([8b53414](https://github.com/duonghieu0712z/neuron404/commit/8b534146e3668d90c517e73be6c519601d1d83bf)).
+
+## [0.1.0-beta.2] - 2026-11-07
+
+### Fixed
+
+- Normalize Windows paths before adding the installed CLI to Git Bash's `PATH`, and check the native PowerShell command shim during release validation ([be60717](https://github.com/duonghieu0712z/neuron404/commit/be60717999209febfe50ebf6eb0c8ee7204c2474)).
+
 ## [0.1.0-beta.1] - 2026-11-07
 
 ### Added
@@ -20,5 +30,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Container packaging with persistent storage under `~/.neuron404`, automatic initialization, and a `/healthz` endpoint.
 - GitHub quality checks, weekly Dependabot updates, and version-tagged multi-platform GHCR publishing with changelog-based release drafts and promotion of tested prerelease images without rebuilding.
 
-[Unreleased]: https://github.com/duonghieu0712z/neuron404/compare/v0.1.0-beta.1...HEAD
+[Unreleased]: https://github.com/duonghieu0712z/neuron404/compare/v0.1.0-beta.2...HEAD
+[0.1.0-beta.2]: https://github.com/duonghieu0712z/neuron404/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/duonghieu0712z/neuron404/releases/tag/v0.1.0-beta.1

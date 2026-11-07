@@ -1,7 +1,7 @@
 # Background Region maintenance
 
-Maintenance is **disabled by default**. With no `NEURON404_MAINTENANCE_PROVIDER` (or with `none`),
-`pnpm maintenance` exits without claiming jobs, writing state, or calling a model. It never selects
+Maintenance is **disabled by default**. In a source checkout, `pnpm maintenance` runs the same worker as the installed `neuron404 maintenance` command. With no `NEURON404_MAINTENANCE_PROVIDER` (or with `none`),
+`neuron404 maintenance` exits without claiming jobs, writing state, or calling a model. It never selects
 Claude or Codex automatically, including when both CLIs are installed.
 
 To enable it, explicitly choose `claude` or `codex` and use that CLI's existing login. The host worker
@@ -9,18 +9,18 @@ audits source fidelity, checks related knowledge, and maintains Region overviews
 same `~/.neuron404` store; its image does not install agent CLIs or copy login credentials.
 
 ```sh
-NEURON404_MAINTENANCE_PROVIDER=claude pnpm maintenance
-NEURON404_MAINTENANCE_PROVIDER=codex pnpm maintenance
-pnpm maintenance --status
-pnpm maintenance --once
-pnpm maintenance --overview --once
-pnpm maintenance --audit --once
-pnpm maintenance --reports
-pnpm maintenance --report REPORT_ID
-pnpm maintenance --retry-failed --once
+NEURON404_MAINTENANCE_PROVIDER=claude neuron404 maintenance
+NEURON404_MAINTENANCE_PROVIDER=codex neuron404 maintenance
+neuron404 maintenance --status
+neuron404 maintenance --once
+neuron404 maintenance --overview --once
+neuron404 maintenance --audit --once
+neuron404 maintenance --reports
+neuron404 maintenance --report REPORT_ID
+neuron404 maintenance --retry-failed --once
 ```
 
-Alternatively, select the provider in `.env`; the remaining commands use that explicit selection.
+Set the provider in the worker's process environment; source installations can also use the repository's `.env`. The remaining commands use that explicit selection.
 `--status` and report-reading commands work while maintenance is disabled. An invalid or unavailable
 provider fails without falling back to another agent. No model is hard-coded: the optional
 `NEURON404_MAINTENANCE_MODEL` overrides the selected CLI's own model default.
@@ -44,8 +44,8 @@ cannot establish independent real-world truth or discover every external change.
 Reports are immutable and content-hashed under `~/.neuron404/maintenance/reports/`. They retain input
 revisions, reviewed scope, evidence checks, exact quotes, and proposals. Open findings carry into
 later knowledge reports with their origin report. Reports appear in Region and neuron sidebars and
-are returned by `pnpm neuron read`; stale reports are labeled when supporting inputs change.
-`pnpm neuron review:reports` and `review:read ID` also expose them to agents. Review events, overview
+are returned by `neuron404 read`; stale reports are labeled when supporting inputs change.
+`neuron404 review:reports` and `review:read ID` also expose them to agents. Review events, overview
 publication, failures, and finding decisions are recorded in `maintenance/events.jsonl`.
 
 Neuron bodies, synapses, source snapshots, and lifecycle states are never modified by the worker.
@@ -53,8 +53,8 @@ Apply an authorized correction through the normal knowledge workflow, then expli
 finding decision; neither command below edits knowledge or marks it human-verified:
 
 ```sh
-pnpm maintenance --report REPORT_ID --resolve FINDING_ID --note "Corrected the claim and checked its evidence."
-pnpm maintenance --report REPORT_ID --dismiss FINDING_ID --note "Reviewed the finding; its interpretation does not apply."
+neuron404 maintenance --report REPORT_ID --resolve FINDING_ID --note "Corrected the claim and checked its evidence."
+neuron404 maintenance --report REPORT_ID --dismiss FINDING_ID --note "Reviewed the finding; its interpretation does not apply."
 ```
 
 When enabled, defaults are 4 reserved CLI requests per hour, a 120-second timeout per call, and 3 attempts
@@ -76,9 +76,4 @@ and return schema-validated output; only neuron404 writes knowledge. Oversized e
 rather than truncated. Fix issues and inspect the report before `--retry-failed`. Ordinary queries
 never start maintenance or call a review model.
 
-Agent integrations implement `MaintenanceAgentAdapter` in
-`src/lib/server/maintenance/agents/types.ts` and register in `agents/index.ts`. An adapter prepares
-an executable, argument array, stdin, and output reader; it does not own scheduling or store writes.
-The shared runner enforces timeout, cancellation, output size and Zod validation. Evidence passage
-references resolve to exact original quotations, and reviewed neuron IDs are constrained by schema.
-Adding an adapter does not enable it or select it by default.
+For adapter extension points and scheduling responsibilities, see [maintenance integrations](architecture.md#maintenance-integrations).

@@ -95,14 +95,27 @@ jobs:
         run: |
           set -euo pipefail
           version=$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")
-          npm install --prefix "$RUNNER_TEMP/cli-install" --ignore-scripts --no-audit --no-fund "$GITHUB_WORKSPACE/artifacts/neuron404-cli-$version.tgz"
-          export PATH="$RUNNER_TEMP/cli-install/node_modules/.bin:$PATH"
+          runner_temp="$RUNNER_TEMP"
+          if [ "$RUNNER_OS" = Windows ]; then
+            runner_temp=$(cygpath -u "$runner_temp")
+          fi
+          npm install --prefix "$runner_temp/cli-install" --ignore-scripts --no-audit --no-fund "$GITHUB_WORKSPACE/artifacts/neuron404-cli-$version.tgz"
+          export PATH="$runner_temp/cli-install/node_modules/.bin:$PATH"
           neuron404 --version
           neuron404 migrate
           neuron404 catalog
-          mkdir -p "$RUNNER_TEMP/skill-install"
-          tar -xzf "artifacts/neuron404-skill-$version.tgz" -C "$RUNNER_TEMP/skill-install"
-          sh "$RUNNER_TEMP/skill-install/neuron404/scripts/neuron404" catalog
+          mkdir -p "$runner_temp/skill-install"
+          tar -xzf "artifacts/neuron404-skill-$version.tgz" -C "$runner_temp/skill-install"
+          sh "$runner_temp/skill-install/neuron404/scripts/neuron404" catalog
+
+      - name: Check native Windows CLI shim
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & "$env:RUNNER_TEMP/cli-install/node_modules/.bin/neuron404.cmd" --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/cli-install/node_modules/.bin/neuron404.cmd" catalog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   docker:
     name: Docker (${{ matrix.arch }})
