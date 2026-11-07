@@ -1,0 +1,174 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*-*']
+  workflow_dispatch:
+
+concurrency:
+  group: image-release-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    name: Validate release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Validate tag, package version and changelog
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$REF_TYPE" != tag ] || [[ "$REF_NAME" != v* ]]; then
+            echo 'Select a version tag when running this workflow manually.' >&2
+            exit 1
+          fi
+          node scripts/release-notes.mjs "${REF_NAME#v}"
+          version=$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'prerelease=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  quality:
+    name: Release quality
+    needs: metadata
+    uses: ./.github/workflows/quality-checks.yml
+
+  publish:
+    name: Publish image and release draft
+    needs: [metadata, quality]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Read release notes
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: node scripts/release-notes.mjs "$RELEASE_VERSION" > "$RUNNER_TEMP/release-notes.md"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install build dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and package CLI and skill
+        run: |
+          pnpm build:headless
+          pnpm package:release
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prevent rebuilding an existing version
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if docker buildx imagetools inspect "$image:$RELEASE_VERSION" > /dev/null 2> "$RUNNER_TEMP/inspect-error.txt"; then
+            echo 'This version image already exists. Recover its release receipt or choose a new version; do not rebuild it.' >&2
+            exit 1
+          elif ! grep -Eqi 'manifest unknown|not found|404' "$RUNNER_TEMP/inspect-error.txt"; then
+            cat "$RUNNER_TEMP/inspect-error.txt" >&2
+            exit 1
+          fi
+
+      - name: Generate image metadata
+        id: image
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.metadata.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.metadata.outputs.prerelease == 'false' }}
+            type=sha
+
+      - name: Build and push multi-platform image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.image.outputs.tags }}
+          labels: ${{ steps.image.outputs.labels }}
+          cache-from: type=gha,scope=release
+          cache-to: type=gha,mode=max,scope=release
+          provenance: mode=max
+          sbom: true
+
+      - name: Record published image
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: node scripts/image-release.mjs record > "$RUNNER_TEMP/image.json"
+
+      - name: Create or update release draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.metadata.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          prerelease=()
+          if [ "$PRERELEASE" = true ]; then
+            prerelease=(--prerelease)
+          fi
+          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/release.json" 2>/dev/null; then
+            node -e "if (!JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).isDraft) { throw new Error('This release is already published.'); }" "$RUNNER_TEMP/release.json"
+            gh release edit "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" "${prerelease[@]}"
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" "${prerelease[@]}"
+          fi
+
+      - name: Attach image receipt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/image.json" artifacts/*.tgz artifacts/release-artifacts.json --clobber

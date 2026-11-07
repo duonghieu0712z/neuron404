@@ -1,0 +1,87 @@
+name: Publish CLI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing published release tag to publish or recover
+        required: true
+        type: string
+
+concurrency:
+  group: npm-publish-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish verified CLI archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.release_tag }}
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Download published release artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+            echo 'Select a version release tag.' >&2
+            exit 1
+          fi
+          gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/release.json"
+          node -e "if (JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).isDraft) { throw new Error('Publish the GitHub Release before publishing its CLI.'); }" "$RUNNER_TEMP/release.json"
+          node scripts/release-notes.mjs "${RELEASE_TAG#v}" > /dev/null
+          gh release download "$RELEASE_TAG" --pattern 'neuron404-*.tgz' --pattern release-artifacts.json --dir artifacts
+      - name: Verify release archives
+        run: node scripts/package-release.ts verify artifacts
+      - name: Check for an identical published package
+        id: existing
+        run: |
+          set -euo pipefail
+          version=$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")
+          if npm view "@duonghieu0712z/neuron404@$version" dist.integrity --json > "$RUNNER_TEMP/npm-integrity.json" 2> "$RUNNER_TEMP/npm-error.txt"; then
+            node --input-type=module <<'JS'
+          import { createHash } from 'node:crypto';
+          import { appendFile, readFile } from 'node:fs/promises';
+          const receipt = JSON.parse(await readFile('artifacts/release-artifacts.json', 'utf8'));
+          const bytes = await readFile(`artifacts/${receipt.cli.file}`);
+          const expected = `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
+          const existing = JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/npm-integrity.json`, 'utf8'));
+          if (existing !== expected) {
+              throw new Error('This npm version already contains a different archive.');
+          }
+          await appendFile(process.env.GITHUB_OUTPUT, 'published=true\n');
+          JS
+          elif ! grep -q E404 "$RUNNER_TEMP/npm-error.txt"; then
+            cat "$RUNNER_TEMP/npm-error.txt" >&2
+            exit 1
+          fi
+      - name: Publish to npm using trusted publishing
+        if: steps.existing.outputs.published != 'true'
+        run: |
+          set -euo pipefail
+          version=$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")
+          tag=latest
+          if [[ "$version" == *-* ]]; then
+            tag=beta
+          fi
+          npm publish "artifacts/neuron404-cli-$version.tgz" --access public --tag "$tag" --provenance --ignore-scripts

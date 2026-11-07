@@ -1,0 +1,149 @@
+name: Quality Checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    name: Application quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Use temporary storage
+        run: echo "NEURON404_DATA_DIR=$RUNNER_TEMP/neuron404-quality" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format
+
+      - name: Check ESLint
+        run: pnpm lint
+
+      - name: Validate release metadata
+        run: pnpm release:check
+
+      - name: Check types and build application
+        run: pnpm build
+
+  headless:
+    name: Headless (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Use temporary storage
+        shell: bash
+        run: echo "NEURON404_DATA_DIR=$RUNNER_TEMP/neuron404-headless" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build headless distribution
+        run: pnpm build:headless
+
+      - name: Package release archives
+        run: pnpm package:release
+
+      - name: Install standalone production dependencies
+        working-directory: headless
+        run: pnpm install --prod --ignore-scripts
+
+      - name: Initialize standalone storage
+        working-directory: headless
+        run: node dist/neuron.js migrate
+
+      - name: Read standalone catalog
+        working-directory: headless
+        run: node dist/neuron.js catalog
+
+      - name: Install CLI archive and use the standalone skill
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")
+          npm install --prefix "$RUNNER_TEMP/cli-install" --ignore-scripts --no-audit --no-fund "$GITHUB_WORKSPACE/artifacts/neuron404-cli-$version.tgz"
+          export PATH="$RUNNER_TEMP/cli-install/node_modules/.bin:$PATH"
+          neuron404 --version
+          neuron404 migrate
+          neuron404 catalog
+          mkdir -p "$RUNNER_TEMP/skill-install"
+          tar -xzf "artifacts/neuron404-skill-$version.tgz" -C "$RUNNER_TEMP/skill-install"
+          sh "$RUNNER_TEMP/skill-install/neuron404/scripts/neuron404" catalog
+
+  docker:
+    name: Docker (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image without publishing
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: neuron404:check
+          cache-from: type=gha,scope=check-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=check-${{ matrix.arch }}
+
+      - name: Check container startup and health
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'docker logs neuron404-check; docker rm -fv neuron404-check' EXIT
+          docker run -d --name neuron404-check --mount type=volume,destination=/data neuron404:check
+          for attempt in {1..30}; do
+            if docker exec neuron404-check node -e "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
