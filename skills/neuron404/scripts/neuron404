@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 NEURON404_SKILL_ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
-if [ -n "${NEURON404_URL:-}" ]; then
+if [ "${1:-}" = "remote" ]; then
+    shift
     exec node "$NEURON404_SKILL_ROOT/scripts/remote.mjs" "$@"
 fi
 if [ -n "${NEURON404_HOME:-}" ]; then

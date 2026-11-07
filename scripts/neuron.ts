@@ -3,6 +3,7 @@ import './env';
 import process from 'node:process';
 
 import { executeNeuronCommand } from '#lib/server/neuron/commands';
+import { parseSyncOptions, synchronizeRemote } from '#lib/server/neuron/sync';
 
 const [command, ...args] = process.argv.slice(2);
 try {
@@ -14,7 +15,13 @@ try {
         }
         payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     }
-    const result = await executeNeuronCommand(command, args, payload);
+    const result =
+        command === 'sync'
+            ? await synchronizeRemote(parseSyncOptions(args))
+            : await executeNeuronCommand(command, args, payload);
+    if (command === 'sync' && (result as { conflicts: string[] }).conflicts.length) {
+        process.exitCode = 1;
+    }
     console.log(JSON.stringify(result, null, 2));
     if (command === 'lint' && (result as unknown[]).length) {
         process.exitCode = 1;

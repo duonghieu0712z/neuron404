@@ -7,6 +7,7 @@ import { count, eq, inArray, sql } from 'drizzle-orm';
 
 import { neuronIndexState, neurons, synapses } from '#lib/server/db/schema';
 
+import { readPartialReferences, writePartialReferences } from './partial-references';
 import { readRegions } from './regions';
 import { readSource } from './sources';
 import { CONTENT_DIR, withStorageLock } from './storage';
@@ -87,9 +88,16 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
         id: name.slice(0, -3),
         stamp: await fileStamp(path.join(NEURONS_DIR, name)),
     }));
+    const partial = await readPartialReferences();
+    const previousPartial = JSON.stringify(partial);
+    const hasAdditions = files.some((file) => !previous.has(file.id));
     const parsed = await mapFiles(
         files.filter(
-            (file) => force || recreateFts || previous.get(file.id)?.fileStamp !== file.stamp,
+            (file) =>
+                force ||
+                recreateFts ||
+                (hasAdditions && Boolean(partial[file.id])) ||
+                previous.get(file.id)?.fileStamp !== file.stamp,
         ),
         async (file) => {
             const snapshot = await readNeuronSnapshot(file.id);
@@ -113,7 +121,7 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
     const regionIds = new Set((await readRegions()).map((region) => region.id));
     for (const neuron of byId.values()) {
         for (const id of neuron.regions) {
-            if (!regionIds.has(id)) {
+            if (!regionIds.has(id) && !partial[neuron.id]?.regions.includes(id)) {
                 throw new Error(`Unknown region "${id}" on neuron ${neuron.id}`);
             }
         }
@@ -121,6 +129,7 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
             throw new Error(`Invalid replacement state on neuron ${neuron.id}`);
         }
         const visited = new Set([neuron.id]);
+        let owner = neuron.id;
         let replacement = neuron.supersededBy;
         while (replacement) {
             if (visited.has(replacement)) {
@@ -129,14 +138,18 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
             visited.add(replacement);
             const target = byId.get(replacement);
             if (!target) {
+                if (partial[owner]?.neurons.includes(replacement)) {
+                    break;
+                }
                 throw new Error(`Unknown replacement: ${replacement}`);
             }
+            owner = target.id;
             replacement = target.supersededBy;
         }
     }
     for (const { neuron } of parsed) {
         for (const edge of neuron.synapses) {
-            if (!byId.has(edge.target)) {
+            if (!byId.has(edge.target) && !partial[neuron.id]?.neurons.includes(edge.target)) {
                 throw new Error(`Unknown synapse target: ${edge.target}`);
             }
         }
@@ -153,7 +166,11 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
                 ),
             );
         for (const edge of incoming) {
-            if (byId.has(edge.sourceNeuronId) && !reparsed.has(edge.sourceNeuronId)) {
+            if (
+                byId.has(edge.sourceNeuronId) &&
+                !reparsed.has(edge.sourceNeuronId) &&
+                !partial[edge.sourceNeuronId]?.neurons.includes(edge.targetNeuronId)
+            ) {
                 throw new Error(`Unknown synapse target: ${edge.targetNeuronId}`);
             }
         }
@@ -161,7 +178,10 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
     await mapFiles([...new Set(parsed.flatMap(({ neuron }) => neuron.sources))], readSource);
     const changed = parsed.filter(
         ({ neuron, revision }) =>
-            force || recreateFts || previous.get(neuron.id)?.revision !== revision,
+            force ||
+            recreateFts ||
+            (hasAdditions && Boolean(partial[neuron.id])) ||
+            previous.get(neuron.id)?.revision !== revision,
     );
     let synapseCount = 0;
     await db.transaction(async (tx) => {
@@ -222,6 +242,9 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
                 byRelation.set(key, group);
             }
             for (const edge of neuron.synapses) {
+                if (!byId.has(edge.target)) {
+                    continue;
+                }
                 const saved = byRelation.get(JSON.stringify([edge.target, edge.kind]))?.shift();
                 if (saved) {
                     remaining.delete(saved.id);
@@ -264,6 +287,16 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
             .values(next)
             .onConflictDoUpdate({ target: neuronIndexState.id, set: next });
     });
+    for (const [id, references] of Object.entries(partial)) {
+        references.neurons = references.neurons.filter((target) => !byId.has(target));
+        references.regions = references.regions.filter((region) => !regionIds.has(region));
+        if (!byId.has(id) || (!references.neurons.length && !references.regions.length)) {
+            delete partial[id];
+        }
+    }
+    if (JSON.stringify(partial) !== previousPartial) {
+        await writePartialReferences(partial);
+    }
     await rm(path.join(CONTENT_DIR, '.index-dirty'), { force: true });
     return {
         neuronCount: files.length,

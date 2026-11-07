@@ -21,6 +21,8 @@ import {
 import { addRegion } from '#lib/server/neuron/regions';
 import { searchNeurons } from '#lib/server/neuron/search';
 import { readSource, saveSource } from '#lib/server/neuron/sources';
+import { normalizeSyncRegions } from '#lib/server/neuron/sync-scope';
+import { readSyncFile, syncManifest, writeSyncFile } from '#lib/server/neuron/sync-storage';
 
 export const REMOTE_READ_COMMANDS = [
     'read',
@@ -32,6 +34,8 @@ export const REMOTE_READ_COMMANDS = [
     'source:read',
     'review:reports',
     'review:read',
+    'sync:manifest',
+    'sync:read',
 ] as const;
 export const REMOTE_WRITE_COMMANDS = [
     'add',
@@ -39,6 +43,7 @@ export const REMOTE_WRITE_COMMANDS = [
     'region:add',
     'region:write',
     'source:add',
+    'sync:write',
 ] as const;
 
 export async function executeNeuronCommand(command: string, args: string[], payload?: unknown) {
@@ -53,7 +58,24 @@ export async function executeNeuronCommand(command: string, args: string[], payl
         return args[index + 1];
     }
     let result: unknown;
-    if (command === 'read') {
+    if (command === 'sync:manifest') {
+        const offset = Number(args[0] ?? 0);
+        if (!Number.isSafeInteger(offset) || offset < 0) {
+            throw new Error('Invalid manifest offset.');
+        }
+        const regions = normalizeSyncRegions(args.slice(1));
+        const entries = await syncManifest(offset, 1001, regions);
+        result = {
+            protocol: 2,
+            regions,
+            entries: entries.slice(0, 1000),
+            next: entries.length > 1000 ? offset + 1000 : null,
+        };
+    } else if (command === 'sync:read') {
+        result = await readSyncFile(args[0], normalizeSyncRegions(args.slice(1)));
+    } else if (command === 'sync:write') {
+        result = await writeSyncFile(payload);
+    } else if (command === 'read') {
         result = await readNeuronContext(args);
     } else if (command === 'neighbors') {
         result = await readNeighbors(args[0], {

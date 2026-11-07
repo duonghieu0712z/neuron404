@@ -7,6 +7,7 @@ import matter from '@11ty/gray-matter';
 
 import { neuronFrontmatterSchema } from '#lib/neuron/schema';
 
+import { readPartialReferences } from './partial-references';
 import { readRegions } from './regions';
 import { readSource } from './sources';
 import { listNeuronFiles, NEURONS_DIR } from './store';
@@ -27,6 +28,7 @@ export interface LintIssue {
 }
 
 export async function lintNeurons(): Promise<LintIssue[]> {
+    const partial = await readPartialReferences();
     const fileNames = await listNeuronFiles();
     const issues: LintIssue[] = [];
     let regionIds: Set<string>;
@@ -63,7 +65,7 @@ export async function lintNeurons(): Promise<LintIssue[]> {
         }
         validNeurons.set(result.data.id, result.data);
         for (const id of result.data.regions) {
-            if (!regionIds.has(id)) {
+            if (!regionIds.has(id) && !partial[result.data.id]?.regions.includes(id)) {
                 issues.push({
                     fileName,
                     kind: 'unknown-region',
@@ -78,7 +80,10 @@ export async function lintNeurons(): Promise<LintIssue[]> {
 
     for (const neuron of validNeurons.values()) {
         for (const synapse of neuron.synapses) {
-            if (!validIds.has(synapse.target)) {
+            if (
+                !validIds.has(synapse.target) &&
+                !partial[neuron.id]?.neurons.includes(synapse.target)
+            ) {
                 issues.push({
                     fileName: `${neuron.id}.md`,
                     kind: 'dangling-synapse',
@@ -96,6 +101,7 @@ export async function lintNeurons(): Promise<LintIssue[]> {
             message = 'Invalid replacement state';
         }
         const visited = new Set([neuron.id]);
+        let owner = neuron.id;
         let replacement = neuron.supersededBy;
         while (replacement) {
             if (visited.has(replacement)) {
@@ -105,9 +111,13 @@ export async function lintNeurons(): Promise<LintIssue[]> {
             visited.add(replacement);
             const target = validNeurons.get(replacement);
             if (!target) {
+                if (partial[owner]?.neurons.includes(replacement)) {
+                    break;
+                }
                 message = `Unknown replacement: ${replacement}`;
                 break;
             }
+            owner = target.id;
             replacement = target.supersededBy;
         }
         if (message) {

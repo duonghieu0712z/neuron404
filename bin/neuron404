@@ -1,8 +1,12 @@
 #!/bin/sh
 set -eu
 NEURON404_ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-if [ -n "${NEURON404_URL:-}" ]; then
+if [ "${1:-}" = "remote" ]; then
+    shift
     exec node "$NEURON404_ROOT/skills/neuron404/scripts/remote.mjs" "$@"
 fi
 cd "$NEURON404_ROOT"
+if [ -f "$NEURON404_ROOT/dist/neuron.js" ] && [ ! -d "$NEURON404_ROOT/src" ]; then
+    exec node "$NEURON404_ROOT/dist/neuron.js" "$@"
+fi
 exec pnpm run neuron "$@"

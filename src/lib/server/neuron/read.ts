@@ -8,6 +8,7 @@ import { neurons, synapses } from '#lib/server/db/schema';
 import { readRegionReviews } from '#lib/server/maintenance/reports';
 
 import { readIndexedNeuron, withIndexedStore } from './indexed-store';
+import { readPartialReferences } from './partial-references';
 import { readRegions } from './regions';
 import { fold } from './search';
 import { CONTENT_DIR, fingerprint, safeId } from './storage';
@@ -18,6 +19,10 @@ export async function readNeuronContext(ids: string[]) {
         throw new Error('Read requires between 1 and 50 neuron IDs');
     }
     return withIndexedStore(async (db) => {
+        const partial = await readPartialReferences();
+        const unavailable = new Set(
+            Object.values(partial).flatMap((references) => references.neurons),
+        );
         const cache = new Map<string, Awaited<ReturnType<typeof readNeuronSnapshot>>>();
         const read = async (id: string) => {
             const cached = cache.get(id);
@@ -53,6 +58,7 @@ export async function readNeuronContext(ids: string[]) {
                 .limit(201);
             const incoming = edges.slice(0, 200);
             const relatedIds = new Set<string>();
+            const missingContext = new Set<string>();
             let truncated = edges.length > incoming.length;
             const visited = new Set([id]);
             let replacement = current.neuron.supersededBy;
@@ -62,6 +68,11 @@ export async function readNeuronContext(ids: string[]) {
                     break;
                 }
                 visited.add(replacement);
+                if (unavailable.has(replacement)) {
+                    missingContext.add(replacement);
+                    truncated = true;
+                    break;
+                }
                 relatedIds.add(replacement);
                 replacement = (await read(replacement)).neuron.supersededBy;
             }
@@ -74,6 +85,11 @@ export async function readNeuronContext(ids: string[]) {
                     .map((edge) => edge.source),
             ];
             for (const target of cautions) {
+                if (unavailable.has(target)) {
+                    missingContext.add(target);
+                    truncated = true;
+                    continue;
+                }
                 if (relatedIds.has(target)) {
                     continue;
                 }
@@ -94,6 +110,10 @@ export async function readNeuronContext(ids: string[]) {
                 incoming,
                 cautions: related,
                 contextTruncated: truncated,
+                unavailableReferences: {
+                    neurons: [...new Set([...(partial[id]?.neurons ?? []), ...missingContext])],
+                    regions: partial[id]?.regions ?? [],
+                },
                 reviews: reviews
                     .filter(
                         (report) =>

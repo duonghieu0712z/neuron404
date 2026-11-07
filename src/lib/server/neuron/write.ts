@@ -4,6 +4,7 @@ import type { Db } from '#lib/server/db/client';
 import { neuronFrontmatterSchema } from '#lib/neuron/schema';
 
 import { synchronizeIndexUnlocked } from './indexer';
+import { readPartialReferences } from './partial-references';
 import { readRegions } from './regions';
 import { readSource } from './sources';
 import { fingerprint, markIndexDirty } from './storage';
@@ -16,16 +17,17 @@ import {
 } from './store';
 
 export async function validateNeuronReferences(neuron: Neuron) {
+    const partial = await readPartialReferences();
     const regions = new Set((await readRegions()).map((region) => region.id));
     const existing = new Map((await readAllNeurons()).map((item) => [item.id, item]));
     existing.set(neuron.id, neuron);
     for (const id of neuron.regions) {
-        if (!regions.has(id)) {
+        if (!regions.has(id) && !partial[neuron.id]?.regions.includes(id)) {
             throw new Error(`Unknown region: ${id}`);
         }
     }
     for (const edge of neuron.synapses) {
-        if (!existing.has(edge.target)) {
+        if (!existing.has(edge.target) && !partial[neuron.id]?.neurons.includes(edge.target)) {
             throw new Error(`Unknown synapse target: ${edge.target}`);
         }
     }
@@ -34,6 +36,7 @@ export async function validateNeuronReferences(neuron: Neuron) {
         throw new Error('A superseded neuron must name its replacement; other states must not.');
     }
     const visited = new Set([neuron.id]);
+    let owner = neuron.id;
     let replacement = neuron.supersededBy;
     while (replacement) {
         if (visited.has(replacement)) {
@@ -42,8 +45,12 @@ export async function validateNeuronReferences(neuron: Neuron) {
         visited.add(replacement);
         const target = existing.get(replacement);
         if (!target) {
+            if (partial[owner]?.neurons.includes(replacement)) {
+                break;
+            }
             throw new Error(`Unknown replacement: ${replacement}`);
         }
+        owner = target.id;
         replacement = target.supersededBy;
     }
 }
