@@ -15,7 +15,9 @@ Invoke `scripts/neuron404` relative to this skill's actual directory. It follows
 "/absolute/path/to/skills/neuron404/scripts/neuron404" catalog --limit 20
 ```
 
-Without `NEURON404_URL`, the launcher requires local shell access, Node.js, pnpm, and an initialized repository database. With `NEURON404_URL`, it uses the bundled remote client and `NEURON404_TOKEN`; Node.js >=24 is sufficient and no local repository or store is needed. Read [remote connection](references/remote.md) when remote mode is configured or a remote request fails. On native Windows without `sh`, invoke `node <skill-directory>/scripts/remote.mjs` with the same arguments for remote mode; for local mode run `pnpm --dir <repository> neuron <arguments>`. WSL/Git Bash and Linux use the shell launcher. A missing capability or inaccessible store is a connection failure, not evidence that no knowledge exists. Do not create another store, install dependencies, or change client permissions merely to answer a recall question.
+Ordinary commands always use local storage, even when `NEURON404_URL` is configured. Local data defaults to `~/.neuron404`; the local runtime needs Node.js >=24 and either the repository with pnpm or an installed headless distribution. The web application is optional. Use `sync` to synchronize an authorized local store with a configured remote; use `remote <command>` only when the user explicitly wants a direct remote operation. Read [remote connection and sync](references/remote.md) before either operation. Never silently switch destinations after a failure.
+
+On native Windows without `sh`, use `node <installation>/dist/neuron.js <command>` locally and `node <skill-directory>/scripts/remote.mjs <command>` for explicit remote access. A missing runtime or inaccessible store is a connection failure, not evidence that no knowledge exists. Do not create another store, install dependencies, or change client permissions merely to answer a retrieval question.
 
 ## Interpret the invocation
 
@@ -27,6 +29,8 @@ The skill is named `neuron404`. In clients that expose skills as slash commands,
 | `search <request>` or a question about stored knowledge                    | [Retrieve](references/retrieve.md); find, read, and answer with evidence                                             |
 | `save <request>` or an explicit request to remember or update knowledge    | [Maintain](references/maintain.md), using the specified conversation context or material                             |
 | `ingest <source or request>` or a request to learn from specified material | [Maintain](references/maintain.md), preserving source evidence and synthesizing durable knowledge                    |
+| `sync` or a request to exchange local and remote knowledge                 | [Synchronize](references/remote.md); preserve requested direction and Regions, then report transfers and conflicts   |
+| `remote <request>` or explicit direct server access                        | [Remote access](references/remote.md); use the specified remote instead of the local replica                         |
 | `review <subject>` or a request to assess stored knowledge                 | [Verify](references/verify.md); report findings and proposed changes without applying them                           |
 
 Examples: `/neuron404`, `/neuron404 search how does asset remapping work?`, `/neuron404 save the decision we just agreed on`, `/neuron404 what did we decide about deployment?`, `/neuron404 learn from the notes in /path/to/project`.

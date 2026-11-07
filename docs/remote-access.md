@@ -21,35 +21,47 @@ No auth token preserves local web behavior and disables the remote API. Setting 
 
 ## Client
 
-Install the `skills/neuron404/` folder in the client's skill directory. A remote-only copy needs Node.js >=24 and its bundled scripts; it does not need this repository, pnpm, SQLite, or a local knowledge store. Existing global symlinks continue to work.
+Local storage remains the default, whether or not a remote is configured. Install the repository or the [headless distribution](headless.md), then register `skills/neuron404/` in the client's skill directory. Ordinary search/save commands always use `~/.neuron404` and continue working offline.
 
-Export these variables in the environment that launches Claude or Codex:
+Export the remote configuration when synchronization is wanted:
 
 ```sh
 export NEURON404_URL="https://neuron.example.com"
 export NEURON404_TOKEN="YOUR_ACCESS_TOKEN"
+bin/neuron404 sync
 ```
 
-Invoke the installed skill normally. To check its connection directly, use its actual installation path:
+`pnpm neuron sync` also works from the repository. On native Windows, set the variables in PowerShell and run `node dist/neuron.js sync` from the headless installation. Linux, macOS, WSL and Git Bash can use the shell launcher. Native Windows/Linux execution has not been validated in this development environment.
+
+Sync compares file hashes against a checkpoint for this remote origin. It uploads local additions/edits and downloads remote additions/edits when only one side changed. It transfers neurons, Region metadata/overviews, sources, history and operation logs. SQLite, maintenance state/reports, authentication receipts and configuration stay local. Operation logs combine complete lines; other files changed differently on both sides produce conflicts. Initial files with the same path but different bytes also conflict. Resolve the content deliberately using the normal revision-checked commands; sync never chooses a winning claim.
+
+Deletions are not propagated. A file missing after an earlier sync is reported as a conflict. Previous replaced bytes remain under `content/sync-backups/`; checkpoints live in `~/.neuron404/sync/`. Back up the complete data directory. Sync is not a multi-file transaction: completed files remain transferred if a later file fails. Rerun after restoring connectivity. API requests retain the 1 MiB limit, so oversized files fail explicitly. No background network traffic or automatic upload is enabled merely by configuring a URL. Without `--region`, the first sync covers all supported local knowledge.
+
+### Select direction and Regions
+
+The skill understands requests such as “upload Region A,” “download Region B,” and “preview sync for A and B.” Its CLI equivalents are:
 
 ```sh
-"$HOME/.agents/skills/neuron404/scripts/neuron404" catalog --limit 5
-"$HOME/.agents/skills/neuron404/scripts/neuron404" search "runtime defaults"
+bin/neuron404 sync --direction push --region region-a --region region-b --dry-run
+bin/neuron404 sync --direction push --region region-a --region region-b
+bin/neuron404 sync --direction pull --region region-a
+bin/neuron404 sync --region region-a --region region-b
 ```
 
-On native Windows, set the same variables in PowerShell and call the Node script directly, using the installed skill's actual path:
+`push` sends local changes to remote; `pull` downloads remote changes; `both` is the default. Repeat `--region` to select several IDs; omitting it selects all. Output includes direction, Region IDs, preview status, push/pull counts, each transferred path, skipped paths and conflicts. In a dry run those are planned counts; no knowledge, sync checkpoints or remote write receipts are changed. One-way sync skips changes needing the other direction and never forces an overwrite of a conflicting destination.
 
-```powershell
-$env:NEURON404_URL = 'https://neuron.example.com'
-$env:NEURON404_TOKEN = 'YOUR_ACCESS_TOKEN'
-node C:\path\to\neuron404\scripts\remote.mjs catalog --limit 5
+Scoped sync transfers member neurons, selected Region definitions/overviews, matching history, referenced sources and their operation receipts. It merges selected catalog entries and receipts while preserving other Regions at the destination. Global catalog history and historical neuron revisions outside the selected membership are omitted. Checkpoints are separate for each Region selection.
+
+Shared neurons remain whole, including other Region IDs. Synapses outside scope keep their IDs without importing the target neuron. Source snapshots also remain whole and may contain broader context; Region filtering is not content redaction or an access-control boundary. Missing targets/Region definitions are recorded locally in `sync/references.json`, reported by `read` as `unavailableReferences`, and excluded from indexed edges until their knowledge arrives. Missing caution/replacement context is explicitly incomplete. A later sync restores those edges without editing the saved neuron. Both client and server require sync protocol 2.
+
+For an explicitly remote operation, use:
+
+```sh
+bin/neuron404 remote catalog --limit 5
+bin/neuron404 remote search "runtime defaults"
 ```
 
-Linux, macOS, WSL and Git Bash can use the shell launcher. For local mode on native Windows, run `pnpm --dir C:\path\to\repository neuron catalog` instead. The remote client uses Node's built-in APIs; native Windows/Linux execution has not been validated in this development environment.
-
-`bin/neuron404` also respects these variables. `pnpm neuron` is the server/local administration command and always accesses the local store. An invalid remote URL, missing token or failed connection never falls back to local storage. HTTP is accepted only for loopback development endpoints. Credentials are sent in headers, never URL parameters; redirects are rejected.
-
-Unsetting `NEURON404_URL` restores the existing local launcher. Local and remote stores are separate destinations, not automatically synchronized replicas. To move an existing store, stop its writers and transfer the complete `~/.neuron404` directory to the server before opening it to clients. Do not overwrite an already populated independent store.
+A copied skill can use `scripts/neuron404 remote <command>` without a local installation; this direct remote mode needs only Node.js >=24. Native Windows can invoke `node <skill-directory>/scripts/remote.mjs <command>`. Direct remote writes do not update the local replica until sync runs. `NEURON404_READ_TOKEN` supports direct reads and pull-only sync; uploading requires the owner token. Failure never switches destinations automatically. HTTP is allowed only on loopback, credentials use headers, and redirects are rejected.
 
 ## API and write recovery
 
