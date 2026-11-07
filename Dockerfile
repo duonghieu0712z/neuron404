@@ -1,5 +1,5 @@
 FROM ghcr.io/pnpm/pnpm:alpine AS base
-RUN pnpm runtime set node lts --global
+RUN pnpm runtime set node 24 --global
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
@@ -14,7 +14,11 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 COPY . .
 RUN NEURON404_DATA_DIR=/tmp/neuron404-build pnpm build
 
-FROM node:lts-alpine
+FROM node:24-alpine
+LABEL org.opencontainers.image.source="https://github.com/duonghieu0712z/neuron404" \
+    org.opencontainers.image.title="neuron404" \
+    org.opencontainers.image.description="Local-first knowledge storage for AI agents with an optional Network web interface" \
+    org.opencontainers.image.licenses="MIT"
 WORKDIR /app
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \

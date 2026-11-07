@@ -6,10 +6,11 @@ Install Docker with Compose v2, then run these commands from the repository:
 
 ```sh
 mkdir -p "$HOME/.neuron404"
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-Open `http://localhost:3000/neurons`. Both the image and container are named `neuron404`. The image builds a standalone production server with [SvelteKit's Node adapter](https://svelte.dev/docs/kit/adapter-node). Compose binds the port to the local machine and mounts `~/.neuron404` at `/data`:
+Open `http://localhost:3000/neurons`. Compose pulls `ghcr.io/duonghieu0712z/neuron404` and names the container `neuron404`. Set `NEURON404_VERSION` in `.env` to pin a release; otherwise it uses `latest`. Images are available after the first successful release. The image contains a standalone production server built with [SvelteKit's Node adapter](https://svelte.dev/docs/kit/adapter-node). Compose binds the port to the local machine and mounts `~/.neuron404` at `/data`:
 
 | Host path                   | Container path       | Purpose                                                    |
 | --------------------------- | -------------------- | ---------------------------------------------------------- |
@@ -29,7 +30,7 @@ When upgrading from repository-local `content/`, stop other writers and copy tha
 ```sh
 mkdir -p "$HOME/.neuron404"
 test ! -e "$HOME/.neuron404/content" && cp -Rp content "$HOME/.neuron404/content"
-docker compose up -d --build
+docker compose up -d
 ```
 
 This retains the repository's original files. SQLite is rebuilt from the copied Markdown, so copying `local.db` is unnecessary. If the destination already contains content, the copy command deliberately does nothing; do not merge independent stores by overwriting files. The repository CLI automatically uses the same store. You can also invoke the container CLI:
@@ -41,4 +42,14 @@ docker compose logs -f neuron404
 docker compose down
 ```
 
-For `add`, `update`, and `source:add`, pipe JSON into the same `exec -T` command. Rebuild after updating the code with `docker compose up -d --build`.
+For `add`, `update`, and `source:add`, pipe JSON into the same `exec -T` command. To upgrade a published image, update the pinned version if applicable, run `docker compose pull`, then `docker compose up -d`. Back up the store first; changing the image version does not reverse migrations.
+
+## Build from source
+
+Use the build override when developing or before the first image has been published:
+
+```sh
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
+```
+
+This builds `neuron404:local` and retains the same service, container name, and data mount. Continue using both `-f` arguments for source-build operations. It does not push anything to GHCR. See [releases](releases.md) for CI, versioning, and publishing.

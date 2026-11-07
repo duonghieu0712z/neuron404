@@ -1,0 +1,5 @@
+services:
+  neuron404:
+    image: neuron404:local
+    build: .
+    pull_policy: build

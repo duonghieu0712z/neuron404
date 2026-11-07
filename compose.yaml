@@ -1,8 +1,7 @@
 services:
   neuron404:
-    image: neuron404
+    image: ghcr.io/duonghieu0712z/neuron404:${NEURON404_VERSION:-latest}
     container_name: neuron404
-    build: .
     environment:
       NEURON404_AUTH_TOKEN: ${NEURON404_AUTH_TOKEN:-}
       NEURON404_READ_TOKEN: ${NEURON404_READ_TOKEN:-}
