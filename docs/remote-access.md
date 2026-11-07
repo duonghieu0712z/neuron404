@@ -31,7 +31,7 @@ export NEURON404_TOKEN="YOUR_ACCESS_TOKEN"
 neuron404 sync
 ```
 
-`pnpm neuron sync` also works from the repository. On native Windows, set the variables in PowerShell and run the installed `neuron404 sync` command. Linux, macOS, WSL and Git Bash can use the shell launcher. Native Windows/Linux execution has not been validated in this development environment.
+`pnpm neuron sync` also works from the repository. On native Windows, set the variables in PowerShell and run the installed `neuron404 sync` command. Linux, macOS, WSL and Git Bash can use the shell launcher.
 
 Sync compares file hashes against a checkpoint for this remote origin. It uploads local additions/edits and downloads remote additions/edits when only one side changed. It transfers neurons, Region metadata/overviews, sources, history and operation logs. SQLite, maintenance state/reports, authentication receipts and configuration stay local. Operation logs combine complete lines; other files changed differently on both sides produce conflicts. Initial files with the same path but different bytes also conflict. Resolve the content deliberately using the normal revision-checked commands; sync never chooses a winning claim.
 
