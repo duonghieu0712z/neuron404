@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Reorganize installation, CLI, storage, maintenance, and release documentation; remove internal agent notes and duplicated setup instructions from user guides.
+- Reorganize installation, CLI, storage, maintenance, and release documentation; remove internal agent notes and duplicated setup instructions from user guides ([8b53414](https://github.com/duonghieu0712z/neuron404/commit/8b534146e3668d90c517e73be6c519601d1d83bf)).
 
 ## [0.1.0-beta.2] - 2026-11-07
 
