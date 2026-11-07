@@ -10,8 +10,15 @@ if [ -n "${NEURON404_HOME:-}" ]; then
 else
     NEURON404_REPOSITORY=$(CDPATH='' cd -- "$NEURON404_SKILL_ROOT/../.." && pwd -P)
 fi
-if [ ! -x "$NEURON404_REPOSITORY/bin/neuron404" ]; then
-    printf '%s\n' 'Cannot locate the neuron404 repository. Set NEURON404_HOME to its absolute path.' >&2
+if [ -x "$NEURON404_REPOSITORY/bin/neuron404" ]; then
+    exec "$NEURON404_REPOSITORY/bin/neuron404" "$@"
+fi
+if [ -n "${NEURON404_HOME:-}" ]; then
+    printf '%s\n' 'NEURON404_HOME does not contain a neuron404 installation.' >&2
     exit 1
 fi
-exec "$NEURON404_REPOSITORY/bin/neuron404" "$@"
+if command -v neuron404 >/dev/null 2>&1; then
+    exec neuron404 "$@"
+fi
+printf '%s\n' 'Install @duonghieu0712z/neuron404 globally, or set NEURON404_HOME to an existing installation.' >&2
+exit 1

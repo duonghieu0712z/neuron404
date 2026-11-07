@@ -1,6 +1,6 @@
 {
     "name": "neuron404",
-    "version": "0.0.1",
+    "version": "0.1.0-beta.1",
     "private": true,
     "license": "MIT",
     "author": "duonghieu0712z",
@@ -16,6 +16,7 @@
         "build:runtime": "vite build --config vite.runtime.config.ts",
         "build:web": "vite build",
         "build-only": "run-s \"build:web {@}\" build:runtime --",
+        "bump": "node scripts/bump-version.mjs",
         "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
         "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
         "db:generate": "drizzle-kit generate",
@@ -34,8 +35,12 @@
         "neuron:lint": "node --import tsx scripts/lint-neurons.ts",
         "neuron:search": "node --import tsx scripts/search-neurons.ts",
         "package:headless": "node scripts/package-headless.mjs",
+        "package:promote": "node scripts/package-release.ts promote",
+        "package:release": "node scripts/package-release.ts pack",
+        "package:verify": "node scripts/package-release.ts verify",
         "prepare": "svelte-kit sync || echo '' && husky",
         "preview": "vite preview",
+        "release:check": "node scripts/release-notes.mjs",
         "type-check": "pnpm check"
     },
     "dependencies": {

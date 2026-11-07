@@ -9,15 +9,15 @@ Use the shared personal knowledge store across projects and conversations. Its f
 
 ## Connect to the store
 
-Invoke `scripts/neuron404` relative to this skill's actual directory. It follows the installed symlink to this repository and delegates to the existing CLI, independently of the calling project. `NEURON404_HOME` optionally selects a different neuron404 repository. Use the client's discovered skill path, not its current project directory, to locate this launcher.
+Use the installed `neuron404` CLI, or invoke `scripts/neuron404` relative to this skill's actual directory. The shell launcher uses an explicit `NEURON404_HOME` installation first, then a repository-backed installation, then the CLI in `PATH`. It works independently of the calling project. An invalid explicit override fails instead of switching installations. Use the client's discovered skill path, not its current project directory, to locate this launcher.
 
 ```sh
 "/absolute/path/to/skills/neuron404/scripts/neuron404" catalog --limit 20
 ```
 
-Ordinary commands always use local storage, even when `NEURON404_URL` is configured. Local data defaults to `~/.neuron404`; the local runtime needs Node.js >=24 and either the repository with pnpm or an installed headless distribution. The web application is optional. Use `sync` to synchronize an authorized local store with a configured remote; use `remote <command>` only when the user explicitly wants a direct remote operation. Read [remote connection and sync](references/remote.md) before either operation. Never silently switch destinations after a failure.
+Ordinary commands always use local storage, even when `NEURON404_URL` is configured. Local data defaults to `~/.neuron404`; the local runtime needs Node.js >=24 and the installed `@duonghieu0712z/neuron404` CLI, an existing repository with pnpm, or a headless distribution. A standalone skill does not require a repository clone. The web application is optional. Use `sync` to synchronize an authorized local store with a configured remote; use `remote <command>` only when the user explicitly wants a direct remote operation. Read [remote connection and sync](references/remote.md) before either operation. Never silently switch destinations after a failure.
 
-On native Windows without `sh`, use `node <installation>/dist/neuron.js <command>` locally and `node <skill-directory>/scripts/remote.mjs <command>` for explicit remote access. A missing runtime or inaccessible store is a connection failure, not evidence that no knowledge exists. Do not create another store, install dependencies, or change client permissions merely to answer a retrieval question.
+On native Windows without `sh`, use `neuron404 <command>` through the package manager's native command shim, or `node <installation>/bin/neuron404.mjs <command>`, and `node <skill-directory>/scripts/remote.mjs <command>` for direct remote access. Current releases use one shared version for the skill, CLI and web; retain sync protocol compatibility when connecting them. A missing runtime or inaccessible store is a connection failure, not evidence that no knowledge exists. Do not create another store, install dependencies, or change client permissions merely to answer a retrieval question.
 
 ## Interpret the invocation
 
@@ -45,6 +45,6 @@ Authorized ingestion includes automatic Region classification. Reuse a suitable 
 
 ## Improve the shared skill
 
-The user authorizes improving this skill during real use when an observed failure, ambiguity, or repeated friction justifies a focused correction. The canonical source is this skill directory after resolving symlinks, normally `<repository>/skills/neuron404/`; a store override does not relocate the skill source. Claude and Codex global entries should remain symlinks to it, so improvements remain in the project and reach both clients. Resolve symlinks before editing; preserve links instead of replacing them with copies.
+The user authorizes improving this skill during real use when an observed failure, ambiguity, or repeated friction justifies a focused correction. The canonical source is this skill directory after resolving symlinks; a store override does not relocate the skill source. In a repository-backed development installation, it is normally `<repository>/skills/neuron404/`, shared by Claude and Codex through symlinks. An archive installation has its own installed canonical copy and does not require cloning a repository. Preserve existing links, and carry authorized improvements back to the development repository when available; do not silently create a checkout or change the installation method.
 
 Update only the relevant instructions or helper, check affected behavior, and briefly report material changes. Do not store private neuron content, project-specific examples, credentials, or transcripts in the skill, invent a new policy from one example, modify unrelated application behavior, or commit automatically. If the repository moves or an installation is copied, reconcile the installed paths with the canonical source before continuing skill maintenance.

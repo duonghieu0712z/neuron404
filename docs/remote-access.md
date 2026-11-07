@@ -21,17 +21,17 @@ No auth token preserves local web behavior and disables the remote API. Setting 
 
 ## Client
 
-Local storage remains the default, whether or not a remote is configured. Install the repository or the [headless distribution](headless.md), then register `skills/neuron404/` in the client's skill directory. Ordinary search/save commands always use `~/.neuron404` and continue working offline.
+Local storage remains the default, whether or not a remote is configured. Install the CLI and skill using the [installation guide](installation.md), or use an existing [headless distribution](headless.md). Ordinary search/save commands always use `~/.neuron404` and continue working offline.
 
 Export the remote configuration when synchronization is wanted:
 
 ```sh
 export NEURON404_URL="https://neuron.example.com"
 export NEURON404_TOKEN="YOUR_ACCESS_TOKEN"
-bin/neuron404 sync
+neuron404 sync
 ```
 
-`pnpm neuron sync` also works from the repository. On native Windows, set the variables in PowerShell and run `node dist/neuron.js sync` from the headless installation. Linux, macOS, WSL and Git Bash can use the shell launcher. Native Windows/Linux execution has not been validated in this development environment.
+`pnpm neuron sync` also works from the repository. On native Windows, set the variables in PowerShell and run the installed `neuron404 sync` command. Linux, macOS, WSL and Git Bash can use the shell launcher. Native Windows/Linux execution has not been validated in this development environment.
 
 Sync compares file hashes against a checkpoint for this remote origin. It uploads local additions/edits and downloads remote additions/edits when only one side changed. It transfers neurons, Region metadata/overviews, sources, history and operation logs. SQLite, maintenance state/reports, authentication receipts and configuration stay local. Operation logs combine complete lines; other files changed differently on both sides produce conflicts. Initial files with the same path but different bytes also conflict. Resolve the content deliberately using the normal revision-checked commands; sync never chooses a winning claim.
 
@@ -42,10 +42,10 @@ Deletions are not propagated. A file missing after an earlier sync is reported a
 The skill understands requests such as “upload Region A,” “download Region B,” and “preview sync for A and B.” Its CLI equivalents are:
 
 ```sh
-bin/neuron404 sync --direction push --region region-a --region region-b --dry-run
-bin/neuron404 sync --direction push --region region-a --region region-b
-bin/neuron404 sync --direction pull --region region-a
-bin/neuron404 sync --region region-a --region region-b
+neuron404 sync --direction push --region region-a --region region-b --dry-run
+neuron404 sync --direction push --region region-a --region region-b
+neuron404 sync --direction pull --region region-a
+neuron404 sync --region region-a --region region-b
 ```
 
 `push` sends local changes to remote; `pull` downloads remote changes; `both` is the default. Repeat `--region` to select several IDs; omitting it selects all. Output includes direction, Region IDs, preview status, push/pull counts, each transferred path, skipped paths and conflicts. In a dry run those are planned counts; no knowledge, sync checkpoints or remote write receipts are changed. One-way sync skips changes needing the other direction and never forces an overwrite of a conflicting destination.
@@ -57,8 +57,8 @@ Shared neurons remain whole, including other Region IDs. Synapses outside scope 
 For an explicitly remote operation, use:
 
 ```sh
-bin/neuron404 remote catalog --limit 5
-bin/neuron404 remote search "runtime defaults"
+neuron404 remote catalog --limit 5
+neuron404 remote search "runtime defaults"
 ```
 
 A copied skill can use `scripts/neuron404 remote <command>` without a local installation; this direct remote mode needs only Node.js >=24. Native Windows can invoke `node <skill-directory>/scripts/remote.mjs <command>`. Direct remote writes do not update the local replica until sync runs. `NEURON404_READ_TOKEN` supports direct reads and pull-only sync; uploading requires the owner token. Failure never switches destinations automatically. HTTP is allowed only on loopback, credentials use headers, and redirects are rejected.

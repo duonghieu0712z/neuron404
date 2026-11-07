@@ -40,3 +40,4 @@ vite.config.ts.timestamp-*
 
 # Standalone CLI/API distribution
 /headless
+/artifacts
