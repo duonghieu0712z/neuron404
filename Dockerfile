@@ -14,7 +14,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 COPY . .
 RUN NEURON404_DATA_DIR=/tmp/neuron404-build pnpm build
 
-FROM node:24-alpine
+FROM node:25-alpine
 LABEL org.opencontainers.image.source="https://github.com/duonghieu0712z/neuron404" \
     org.opencontainers.image.title="neuron404" \
     org.opencontainers.image.description="Local-first knowledge storage for AI agents with an optional Network web interface" \
