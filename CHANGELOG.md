@@ -6,10 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- File-based secrets for authentication tokens, Cloudflare credentials, and provider API keys, including Docker secret mounts through `_FILE` environment variables. ([2ca12f4](https://github.com/duonghieu0712z/neuron404/commit/2ca12f4c84d58a64298a35009cc1f1717c11ef51))
+
 ### Fixed
 
 - Correct CLI installation instructions to use the published GitHub Release archive while the npm package is unavailable, and fix the npm publishing workflow's local archive path. ([7d6276e](https://github.com/duonghieu0712z/neuron404/commit/7d6276e9cc17e9ed2b4d601b328fec35f80a1251))
 - Correct first-run development initialization, standalone API commands and healthcheck scope, read-only client token configuration, and release promotion/runtime documentation. ([7d6276e](https://github.com/duonghieu0712z/neuron404/commit/7d6276e9cc17e9ed2b4d601b328fec35f80a1251))
+- Open web links in Markdown and captured source URLs in a separate tab while preserving internal Neuron navigation. ([2789167](https://github.com/duonghieu0712z/neuron404/commit/27891676fd79a802c09782e872be07b1b10bc510))
 
 ## [0.1.0] - 2026-11-07
 
