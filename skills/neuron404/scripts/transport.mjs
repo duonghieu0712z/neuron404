@@ -1,5 +1,7 @@
 import process from 'node:process';
 
+import { loadFileSecrets } from './file-secrets.mjs';
+
 const MAX_BODY_BYTES = 1024 * 1024;
 
 function serverOrigin() {
@@ -19,6 +21,7 @@ function serverOrigin() {
 }
 
 function requestHeaders(requestId) {
+    loadFileSecrets();
     const token = process.env.NEURON404_TOKEN;
     if (!token) {
         throw new Error('Set NEURON404_TOKEN for remote access.');

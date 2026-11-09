@@ -13,6 +13,12 @@ NEURON404_PUBLIC_URL=https://neuron.example.com
 
 Tokens must contain 32–1024 printable, non-whitespace ASCII characters; the generated hex secret satisfies this requirement. `NEURON404_AUTH_TOKEN` grants API read/write access and signs web sessions. An optional, different `NEURON404_READ_TOKEN` grants read-only API access and cannot sign into the web. Keep these values private; rotating the main token invalidates its API access and all web sessions.
 
+For Docker secret mounts, use `NEURON404_AUTH_TOKEN_FILE` and
+`NEURON404_READ_TOKEN_FILE` instead of direct values. The CLI also supports
+`NEURON404_TOKEN_FILE`, `CF_ACCESS_CLIENT_ID_FILE`, and
+`CF_ACCESS_CLIENT_SECRET_FILE`. See [file-based secrets](deployment.md#secrets-from-files)
+for mount configuration and validation rules.
+
 Run the existing Compose deployment behind your HTTPS reverse proxy. For a non-Docker production build, start with `node dist/server.js`; this wrapper retains the adapter’s shutdown handling and supplies the correct local/proxy protocol default. Compose keeps the application port bound to loopback and passes the authentication variables to the container. It trusts `X-Forwarded-Proto` from that proxy. Set `NEURON404_PUBLIC_URL` to the exact external HTTPS origin so requests with an unexpected origin are rejected. Do not expose the application port directly to untrusted clients.
 
 Open the domain and sign in with the main access token. Sessions use an HttpOnly, SameSite cookie, expire after 12 hours, and use Secure cookies over HTTPS. Sign out from the header. Failed sign-ins are limited per observed client address in memory; a proxy may make clients share that address. Use proxy-side rate limiting for Internet-facing deployments.

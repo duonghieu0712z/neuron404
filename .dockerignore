@@ -20,3 +20,5 @@
 !skills/neuron404/scripts/
 !skills/neuron404/scripts/transport.mjs
 !skills/neuron404/scripts/transport.d.mts
+!skills/neuron404/scripts/file-secrets.mjs
+!skills/neuron404/scripts/file-secrets.d.mts
