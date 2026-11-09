@@ -7,6 +7,8 @@ description: Search personal knowledge with evidence, save or update authorized 
 
 Use the shared personal knowledge store across projects and conversations. Its foundation is LLM Wiki: preserve evidence, maintain accumulated knowledge, and retrieve it with citations. **Neuron** is a coherent knowledge unit; **Synapse** is a typed semantic relationship; **Region** groups knowledge; **Network** is the exploration view. Use neuroscience or neurobiology terminology for new product concepts, according to their actual roles. Region membership uses `regions` in CLI payloads and results. An isolated neuron is valid. Shared region membership does not imply a synapse.
 
+The store serves human readers and AI retrieval. Knowledge must be understandable as well as accurate and traceable; the Maintain workflow covers explanation, titles, examples, and evidence presentation.
+
 ## Connect to the store
 
 Use the installed `neuron404` CLI, or invoke `scripts/neuron404` relative to this skill's actual directory. The shell launcher uses an explicit `NEURON404_HOME` installation first, then a repository-backed installation, then the CLI in `PATH`. It works independently of the calling project. An invalid explicit override fails instead of switching installations. Use the client's discovered skill path, not its current project directory, to locate this launcher.
