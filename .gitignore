@@ -8,6 +8,7 @@ node_modules
 /.svelte-kit
 /build
 /dist
+/temp
 
 # OS
 .DS_Store
@@ -34,9 +35,6 @@ vite.config.ts.timestamp-*
 !.vscode/extensions.json
 
 .eslintcache
-
-# Local archive of development notes migrated from personal neurons
-/.claude/notes/development-neurons/
 
 # Standalone CLI/API distribution
 /headless
