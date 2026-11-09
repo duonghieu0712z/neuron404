@@ -8,6 +8,7 @@
     import MarkdownContent from '#lib/components/markdown-content.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
+    import { webHref } from '#lib/links';
 
     let {
         data,
@@ -82,11 +83,25 @@
         >
             <ul class="space-y-3 text-sm">
                 {#each data.sources as entry (entry.id)}
+                    {@const href = webHref(entry.source.uri)}
                     <li>
                         <p class="font-medium">{entry.source.title}</p>
-                        <p class="text-xs break-all text-muted-foreground">
-                            {entry.source.uri}
-                        </p>
+                        {#if href}
+                            <!-- eslint-disable svelte/no-navigation-without-resolve -- webHref only permits absolute HTTP(S) URLs. -->
+                            <a
+                                {href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-xs break-all text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                            >
+                                {entry.source.uri}
+                            </a>
+                            <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                        {:else}
+                            <p class="text-xs break-all text-muted-foreground">
+                                {entry.source.uri}
+                            </p>
+                        {/if}
                         {#if entry.source.locator}<p class="text-xs text-muted-foreground">
                                 {entry.source.locator}
                             </p>{/if}

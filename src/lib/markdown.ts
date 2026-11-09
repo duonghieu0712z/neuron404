@@ -1,6 +1,8 @@
 import { Lexer, Parser } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 
+import { webHref } from '#lib/links';
+
 export function renderMarkdownBlocks(
     content: string,
     neuronHref: (id: string) => string,
@@ -26,7 +28,7 @@ export function renderMarkdownBlocks(
             html: sanitizeHtml(Parser.parse([token], { gfm: true }), {
                 allowedTags: sanitizeHtml.defaults.allowedTags,
                 allowedAttributes: {
-                    a: ['href', 'title', 'data-neuron-id'],
+                    a: ['href', 'title', 'data-neuron-id', 'target', 'rel'],
                     code: ['class'],
                     th: ['align'],
                     td: ['align'],
@@ -46,7 +48,13 @@ export function renderMarkdownBlocks(
                                       'data-neuron-id': match[1],
                                       ...(title ? { title } : {}),
                                   }
-                                : { ...(href ? { href } : {}), ...(title ? { title } : {}) },
+                                : {
+                                      ...(href ? { href } : {}),
+                                      ...(title ? { title } : {}),
+                                      ...(href && webHref(href)
+                                          ? { target: '_blank', rel: 'noopener noreferrer' }
+                                          : {}),
+                                  },
                         };
                     },
                 },
