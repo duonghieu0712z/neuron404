@@ -6,6 +6,16 @@ A **Neuron** is a knowledge unit, a **Synapse** is a typed semantic relationship
 
 Markdown holds authoritative knowledge; SQLite is a derived search index. The web application, CLI and remote API use the same storage services, revision checks and history.
 
+## Code boundaries
+
+Routes load data, handle requests and compose feature components. Product components live in `src/lib/components/` under `network`, `neuron`, `review`, `markdown` and `workspace`; `ui` contains the shadcn-svelte primitives. Workspace components own the header, search, resizable detail layout and scroll controls. Markdown rendering and citation interactions are separate from the content components.
+
+`src/lib/network/` owns graph preparation, renderer state and styles, canvas layers, motion, simulation forces, search and browser preferences. Each renderer instance owns its layers and disposes event listeners, observers and animation frames when the view changes. The Network route connects these services to selection and controls.
+
+Server modules separate orchestration from storage and validation. Maintenance builds review bundles, prepares evidence references, validates results, stores reports and schedules leased work independently of model execution. Neuron retrieval separates catalogs, context expansion, neighbors and history; index reconciliation delegates transactional persistence. Sync keeps path checks, content validation, scoped reads, manifests and remote transport separate from conflict resolution. Existing command entry points retain their public exports.
+
+Split modules when their responsibilities diverge, rather than to meet a line limit. Keep small, cohesive modules intact, place helpers beside their feature and keep dependencies directed toward domain and storage services. Release archive helpers live in `scripts/release/`; executable scripts retain their existing command paths.
+
 ## Data layout
 
 The default root is `~/.neuron404`. Docker mounts that directory at `/data`; `NEURON404_DATA_DIR` can override the root for another deployment location.
