@@ -22,6 +22,8 @@ A neuron can contain several paragraphs supporting one coherent understanding. A
 
 Write for a reader encountering the subject, with enough context for independent retrieval. Establish what the subject means and why it matters before relying on specialist distinctions; explain unfamiliar terms when first needed or link to a prerequisite neuron. Choose specific, understandable titles that reflect the actual scope. Question titles are optional. Split or combine neurons by independently useful understanding, not by a heading, keyword, or a user's illustrative title.
 
+Write naturally in the requested language rather than translating source sentences word for word. Use each term in its actual context, explain technical meanings where needed, and check that a simpler paraphrase preserves the claim. Terminology consistency does not justify awkward phrasing or treating related concepts as synonyms.
+
 Explain relationships and reasoning rather than listing claims. When an example would resolve an abstraction, show enough input, processing, and outcome to make the idea usable; label invented examples and distinguish them from observed results. Use tables for comparable alternatives, diagrams for relationships or flows, and charts for supported quantitative comparisons when they clarify the content. Check renderer support before relying on footnotes or Mermaid. Neither a fixed article template nor a visual in every neuron is required.
 
 Place qualifications beside the claims they constrain. Keep conditions needed to interpret a retrieved neuron independently, but put extended explanations in the appropriate neuron and link to them instead of repeating a full warning across a batch. An overview should introduce the subject and help readers find a path through it, rather than opening with an audit log.
@@ -35,6 +37,8 @@ Region classification is part of an authorized save. Read `catalog`, interpret t
 When no existing Region fits, create one with `region:add` using JSON `{id, title, description}`. Choose a stable lowercase kebab-case ID and a description that makes the Region's scope clear to future agents. Reuse an appropriate existing Region; avoid synonyms, one Region per neuron, and catch-all names such as Unfiled or Miscellaneous. Project-specific architecture and deployment knowledge belongs to that project's Region, not another project's principles merely because they share tools. A source is evidence, not an automatic Region: classify each neuron by meaning, and use multiple memberships only when each applies substantively.
 
 Creating a necessary Region is included in the authorized ingestion workflow. The AI running this skill makes the semantic decision; the CLI stores and validates it and does not call a separate model. Register new definitions before saving neurons, pass their IDs in `regions`, and verify membership in the write receipt. Agent `add` commands reject missing or empty membership. When updating an unfiled neuron, classify it as part of the update; preserve valid existing memberships otherwise. If source content is inaccessible or insufficient to identify a subject, report the incomplete ingest instead of claiming an Unfiled save is complete. An isolated neuron may still have a Region without any synapse.
+
+To rename an existing Region without changing its ID or memberships, use `region:update ID` with JSON `{expected: {id, title, description}, title, description}`. Read the current metadata from `catalog` or `region:read` and pass it unchanged in `expected`; a concurrent metadata change is rejected. Earlier catalog versions remain in history.
 
 ## Maintain Region overviews
 
@@ -63,6 +67,8 @@ A synapse is directed from the neuron being written to an existing target:
 | `questions`   | Raises an unresolved challenge to the target                           |
 
 Explain a non-obvious relationship in `note`. Shared vocabulary, origin, region, or visual proximity is insufficient. Do not invent reverse synapses: incoming links are derived automatically. Cross-region synapses are valid when supported by content. Check affected neighbors for material consequences of an update, but do not cascade speculative edits across the collection.
+
+When the user explicitly requests permanent deletion, use local `delete ID` with JSON `{expectedRevision, purgeHistory}`. Read the current revision first. The command refuses deletion while another current neuron or Region article references the target; reconcile those references or delete dependent articles first within the authorized scope. Set `purgeHistory: true` only when the user also wants its saved revisions removed. Raw source snapshots are retained. Deletion is local and is not propagated by sync. Do not substitute retraction for an explicit deletion request.
 
 ## Write and confirm
 
