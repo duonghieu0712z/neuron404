@@ -21,7 +21,7 @@
     import { layerPlain, sdfCircle } from 'sigma/rendering';
     import { onMount, tick, untrack } from 'svelte';
 
-    import NetworkSection from '#lib/components/network-section.svelte';
+    import NetworkSection from '#lib/components/network/network-section.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
     import { Card, CardContent } from '#lib/components/ui/card';

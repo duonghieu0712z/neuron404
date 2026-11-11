@@ -3,9 +3,9 @@
 
     import { resolve } from '$app/paths';
 
-    import DetailSection from '#lib/components/detail-section.svelte';
-    import KnowledgeReview from '#lib/components/knowledge-review.svelte';
-    import MarkdownContent from '#lib/components/markdown-content.svelte';
+    import MarkdownContent from '#lib/components/markdown/markdown-content.svelte';
+    import DetailSection from '#lib/components/neuron/detail-section.svelte';
+    import KnowledgeReview from '#lib/components/review/knowledge-review.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
     import { webHref } from '#lib/links';
@@ -24,6 +24,7 @@
         if (!onSelectNeuron) {
             return;
         }
+
         event.preventDefault();
         onSelectNeuron(id);
     }

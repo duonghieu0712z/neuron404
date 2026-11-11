@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { PageProps } from './$types';
 
-    import NeuronDetail from '#lib/components/neuron-detail.svelte';
+    import NeuronDetail from '#lib/components/neuron/neuron-detail.svelte';
 
     let { data }: PageProps = $props();
 </script>

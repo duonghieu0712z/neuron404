@@ -3,8 +3,8 @@
 
     import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
-    import DetailSection from '#lib/components/detail-section.svelte';
-    import ReviewEvidence from '#lib/components/review-evidence.svelte';
+    import DetailSection from '#lib/components/neuron/detail-section.svelte';
+    import ReviewEvidence from '#lib/components/review/review-evidence.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
     import {

@@ -31,12 +31,14 @@
         summary?: Snippet;
         children: Snippet;
     } = $props();
+
     const toggleLabel = $derived(`${open ? 'Collapse' : 'Expand'} ${title}`);
 
     const chevronRotation = $derived.by(() => {
         if (vertical) {
             return open ? 'rotate-90' : '-rotate-90';
         }
+
         return open ? 'rotate-90' : '';
     });
 </script>

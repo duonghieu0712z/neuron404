@@ -5,13 +5,7 @@ import sanitizeHtml from 'sanitize-html';
 
 import { webHref } from '#lib/links';
 
-function citationKey(number: string, href: string) {
-    return `${number}:${webHref(href) ?? href}`;
-}
-
-function citationDescription(title: string | null | undefined) {
-    return (title ?? '').replace(/Snapshot sha256:[a-f0-9]{64};?\s*/g, '').trim();
-}
+import { citationDescription, citationKey } from './markdown/citations';
 
 export function renderMarkdownBlocks(
     content: string,
@@ -31,14 +25,18 @@ export function renderMarkdownBlocks(
             content = `${first[1]}\n${content}`;
         }
     }
+
     const tokens = Lexer.lex(content, { gfm: true });
     const references = new Map<string, { label: string; description: string }>();
+
     for (const token of tokens) {
         if (token.type !== 'paragraph' || !token.tokens) {
             continue;
         }
+
         const number = /^\[(\d+)\]\s*$/.exec(token.tokens[0]?.raw ?? '')?.[1];
         const link = token.tokens[1];
+
         if (number && link?.type === 'link') {
             references.set(citationKey(number, link.href), {
                 label: link.text,
@@ -95,21 +93,26 @@ export function renderMarkdownBlocks(
                         a: (tagName, attributes) => {
                             const match = /^neuron:([a-zA-Z0-9_-]+)$/.exec(attributes.href ?? '');
                             const { href, title } = attributes;
+
                             const externalHref = href?.startsWith('//')
                                 ? webHref(`https:${href}`)
                                 : href && webHref(href);
+
                             const number = /^\d+$/.test(attributes['data-citation'] ?? '')
                                 ? attributes['data-citation']
                                 : undefined;
+
                             const reference =
                                 number && href
                                     ? references.get(citationKey(number, href))
                                     : undefined;
+
                             const label =
                                 reference?.label ??
                                 (externalHref
                                     ? new URL(externalHref).hostname
                                     : `Reference ${number}`);
+
                             const citationAttributes: Record<string, string> = number
                                 ? {
                                       'data-citation': number,
@@ -119,8 +122,10 @@ export function renderMarkdownBlocks(
                                       'aria-label': `Reference ${number}: ${label}`,
                                   }
                                 : {};
+
                             const titleAttributes: Record<string, string> =
                                 title && !number ? { title } : {};
+
                             return {
                                 tagName,
                                 attribs: match
