@@ -13,7 +13,9 @@
     import RegionOverview from '#lib/components/region-overview.svelte';
     import { Button } from '#lib/components/ui/button';
     import { Card } from '#lib/components/ui/card';
+    import * as Resizable from '#lib/components/ui/resizable';
     import { ScrollArea } from '#lib/components/ui/scroll-area';
+    import * as Sheet from '#lib/components/ui/sheet';
     import {
         Sidebar,
         SidebarContent,
@@ -26,11 +28,18 @@
         TooltipProvider,
         TooltipTrigger,
     } from '#lib/components/ui/tooltip';
+    import { IsMobile } from '#lib/hooks/is-mobile.svelte';
     import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
     let { children }: { children: Snippet } = $props();
 
     const panel = getNeuronPanelContext();
+    const isMobile = new IsMobile();
+    const panelOpen = $derived(!!panel.selected || !!panel.region);
+    let workspaceWidth = $state(0);
+    const sidebarMinSize = $derived(
+        workspaceWidth ? Math.min(45, (320 / workspaceWidth) * 100) : 30,
+    );
     const inNetwork = $derived(page.url.pathname === resolve('/network'));
 
     let sidebarViewport = $state<HTMLElement | null>(null);
@@ -96,127 +105,172 @@
 
 <svelte:window onclick={handleWindowClick} />
 
+{#snippet details()}
+    {#if panel.selected || panel.region}
+        <SidebarHeader class="flex-row items-center justify-between border-b">
+            <h2 class="min-w-0 truncate text-sm font-semibold">
+                {panel.region?.region.title ?? panel.selected?.neuron.title}
+            </h2>
+            <TooltipProvider>
+                <div class="flex shrink-0 items-center gap-1">
+                    {#if panel.selected}
+                        <Tooltip>
+                            <TooltipTrigger>
+                                {#snippet child({ props })}
+                                    <Button
+                                        {...props}
+                                        href={inNetwork ? resolve('/neurons') : resolve('/network')}
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label={inNetwork
+                                            ? 'View in Neurons'
+                                            : 'View in Network'}
+                                    >
+                                        {#if inNetwork}
+                                            <LayoutGridIcon class="size-4" />
+                                        {:else}
+                                            <NetworkIcon class="size-4" />
+                                        {/if}
+                                    </Button>
+                                {/snippet}
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                                {inNetwork ? 'View in Neurons' : 'View in Network'}
+                            </TooltipContent>
+                        </Tooltip>
+                    {/if}
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Close details"
+                        onclick={panel.close}
+                    >
+                        <XIcon class="size-4" />
+                    </Button>
+                </div>
+            </TooltipProvider>
+        </SidebarHeader>
+        <SidebarContent class="relative overflow-hidden">
+            <ScrollArea bind:viewportRef={sidebarViewport} class="min-h-0 flex-1">
+                <div class="p-4 pb-20 [&_a]:underline-offset-4 [&_a:hover]:underline">
+                    {#if panel.region}
+                        <RegionOverview data={panel.region} onSelectNeuron={panel.open} />
+                    {:else if panel.selected}
+                        <NeuronDetail
+                            data={panel.selected}
+                            layout="panel"
+                            onSelectNeuron={panel.open}
+                        />
+                    {/if}
+                </div>
+            </ScrollArea>
+            {#if canScrollUp || canScrollDown}
+                <TooltipProvider>
+                    <Card
+                        class="absolute right-4 bottom-4 gap-1 bg-card/95 p-1 shadow-sm backdrop-blur-sm"
+                    >
+                        <Tooltip>
+                            <TooltipTrigger>
+                                {#snippet child({ props })}
+                                    <Button
+                                        {...props}
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label="Scroll to top"
+                                        disabled={!canScrollUp}
+                                        onclick={() => jumpTo('top')}
+                                    >
+                                        <ArrowUpToLineIcon class="size-4" />
+                                    </Button>
+                                {/snippet}
+                            </TooltipTrigger>
+                            <TooltipContent side="left">Scroll to top</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger>
+                                {#snippet child({ props })}
+                                    <Button
+                                        {...props}
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label="Scroll to bottom"
+                                        disabled={!canScrollDown}
+                                        onclick={() => jumpTo('bottom')}
+                                    >
+                                        <ArrowDownToLineIcon class="size-4" />
+                                    </Button>
+                                {/snippet}
+                            </TooltipTrigger>
+                            <TooltipContent side="left">Scroll to bottom</TooltipContent>
+                        </Tooltip>
+                    </Card>
+                </TooltipProvider>
+            {/if}
+        </SidebarContent>
+    {/if}
+{/snippet}
+
 <SidebarProvider
-    open={!!panel.selected || !!panel.region}
+    open={panelOpen}
     onOpenChange={(open) => {
         if (!open) {
             panel.close();
         }
     }}
-    style="--sidebar-width: 34rem;"
     class="relative h-full min-h-full w-full items-stretch"
 >
-    <ScrollArea
-        data-neuron-surface={inNetwork || page.route.id?.startsWith('/neurons') ? '' : undefined}
-        class="h-full min-w-0 flex-1 **:data-scroll-area-content:h-full"
-    >
-        {@render children()}
-    </ScrollArea>
-
-    <Sidebar side="right" class="top-14 bottom-0 h-auto">
-        {#if panel.selected || panel.region}
-            <SidebarHeader class="flex-row items-center justify-between border-b">
-                <h2 class="min-w-0 truncate text-sm font-semibold">
-                    {panel.region?.region.title ?? panel.selected?.neuron.title}
-                </h2>
-                <TooltipProvider>
-                    <div class="flex shrink-0 items-center gap-1">
-                        {#if panel.selected}
-                            <Tooltip>
-                                <TooltipTrigger>
-                                    {#snippet child({ props })}
-                                        <Button
-                                            {...props}
-                                            href={inNetwork
-                                                ? resolve('/neurons')
-                                                : resolve('/network')}
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={inNetwork
-                                                ? 'View in Neurons'
-                                                : 'View in Network'}
-                                        >
-                                            {#if inNetwork}
-                                                <LayoutGridIcon class="size-4" />
-                                            {:else}
-                                                <NetworkIcon class="size-4" />
-                                            {/if}
-                                        </Button>
-                                    {/snippet}
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">
-                                    {inNetwork ? 'View in Neurons' : 'View in Network'}
-                                </TooltipContent>
-                            </Tooltip>
-                        {/if}
-                        <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Close details"
-                            onclick={panel.close}
-                        >
-                            <XIcon class="size-4" />
-                        </Button>
-                    </div>
-                </TooltipProvider>
-            </SidebarHeader>
-            <SidebarContent class="relative overflow-hidden">
-                <ScrollArea bind:viewportRef={sidebarViewport} class="min-h-0 flex-1">
-                    <div class="p-4 pb-20 [&_a]:underline-offset-4 [&_a:hover]:underline">
-                        {#if panel.region}
-                            <RegionOverview data={panel.region} onSelectNeuron={panel.open} />
-                        {:else if panel.selected}
-                            <NeuronDetail
-                                data={panel.selected}
-                                layout="panel"
-                                onSelectNeuron={panel.open}
-                            />
-                        {/if}
-                    </div>
+    <div class="h-full min-w-0 flex-1" bind:clientWidth={workspaceWidth}>
+        <Resizable.PaneGroup direction="horizontal" autoSaveId="neuron404-workspace">
+            <Resizable.Pane id="workspace" order={0} minSize={30}>
+                <ScrollArea
+                    data-neuron-surface={inNetwork || page.route.id?.startsWith('/neurons')
+                        ? ''
+                        : undefined}
+                    class="h-full min-w-0 **:data-scroll-area-content:h-full"
+                >
+                    {@render children()}
                 </ScrollArea>
-                {#if canScrollUp || canScrollDown}
-                    <TooltipProvider>
-                        <Card
-                            class="absolute right-4 bottom-4 gap-1 bg-card/95 p-1 shadow-sm backdrop-blur-sm"
-                        >
-                            <Tooltip>
-                                <TooltipTrigger>
-                                    {#snippet child({ props })}
-                                        <Button
-                                            {...props}
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label="Scroll to top"
-                                            disabled={!canScrollUp}
-                                            onclick={() => jumpTo('top')}
-                                        >
-                                            <ArrowUpToLineIcon class="size-4" />
-                                        </Button>
-                                    {/snippet}
-                                </TooltipTrigger>
-                                <TooltipContent side="left">Scroll to top</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger>
-                                    {#snippet child({ props })}
-                                        <Button
-                                            {...props}
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label="Scroll to bottom"
-                                            disabled={!canScrollDown}
-                                            onclick={() => jumpTo('bottom')}
-                                        >
-                                            <ArrowDownToLineIcon class="size-4" />
-                                        </Button>
-                                    {/snippet}
-                                </TooltipTrigger>
-                                <TooltipContent side="left">Scroll to bottom</TooltipContent>
-                            </Tooltip>
-                        </Card>
-                    </TooltipProvider>
-                {/if}
-            </SidebarContent>
-        {/if}
-    </Sidebar>
+            </Resizable.Pane>
+            {#if panelOpen && !isMobile.current}
+                <Resizable.Handle
+                    withHandle
+                    aria-label="Resize details sidebar"
+                    class="z-10 after:w-3 hover:bg-ring focus-visible:bg-ring"
+                />
+                <Resizable.Pane
+                    id="details"
+                    order={1}
+                    defaultSize={40}
+                    minSize={sidebarMinSize}
+                    maxSize={70}
+                >
+                    <Sidebar collapsible="none" side="right" class="h-full w-full">
+                        {@render details()}
+                    </Sidebar>
+                </Resizable.Pane>
+            {/if}
+        </Resizable.PaneGroup>
+    </div>
+    {#if isMobile.current}
+        <Sheet.Root
+            open={panelOpen}
+            onOpenChange={(open) => {
+                if (!open) {
+                    panel.close();
+                }
+            }}
+        >
+            <Sheet.Content
+                side="right"
+                showCloseButton={false}
+                class="w-[min(34rem,100vw)] gap-0 p-0"
+            >
+                <Sheet.Header class="sr-only">
+                    <Sheet.Title>Details</Sheet.Title>
+                    <Sheet.Description>Selected neuron or region details.</Sheet.Description>
+                </Sheet.Header>
+                {@render details()}
+            </Sheet.Content>
+        </Sheet.Root>
+    {/if}
 </SidebarProvider>
