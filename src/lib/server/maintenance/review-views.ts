@@ -49,7 +49,9 @@ export async function readRegionReviews(
     }
 
     const byId = new Map(snapshots.map((item) => [item.neuron.id, item]));
-    const members = snapshots.filter(({ neuron }) => neuron.regions.includes(regionId));
+    const members = snapshots.filter(
+        ({ neuron }) => neuron.lifecycle === 'active' && neuron.regions.includes(regionId),
+    );
     const region = (await readRegions()).find((item) => item.id === regionId);
     const decisions = await readDecisions();
 

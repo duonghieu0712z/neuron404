@@ -1,6 +1,6 @@
 import type { Db } from '#lib/server/db/client';
 
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { createDb } from '#lib/server/db/client';
 import { neurons } from '#lib/server/db/schema';
@@ -10,7 +10,7 @@ import { withStorageLock } from './storage';
 import { readNeuronSnapshot } from './store';
 
 export interface IndexSnapshot {
-    neuron: { id: string; title: string; regions: string[] };
+    neuron: { id: string; title: string; regions: string[]; lifecycle: string };
     revision: string;
 }
 
@@ -35,13 +35,17 @@ export async function readIndexSnapshots(db: Db, scope: { region?: string; ids?:
             id: neurons.id,
             title: neurons.title,
             regions: neurons.regions,
+            lifecycle: neurons.lifecycle,
             revision: neurons.revision,
         })
         .from(neurons)
         .where(
             scope.ids
                 ? inArray(neurons.id, scope.ids)
-                : sql`EXISTS (SELECT 1 FROM json_each(${neurons.regions}) WHERE value = ${scope.region})`,
+                : and(
+                      sql`EXISTS (SELECT 1 FROM json_each(${neurons.regions}) WHERE value = ${scope.region})`,
+                      eq(neurons.lifecycle, 'active'),
+                  ),
         );
     return rows.map(({ revision, ...neuron }) => ({ neuron, revision }));
 }

@@ -79,7 +79,9 @@ export async function readRegionOverview(
         }
         snapshots = await readIndexSnapshots(db, { region: id });
     }
-    const members = snapshots.filter(({ neuron }) => neuron.regions.includes(id));
+    const members = snapshots.filter(
+        ({ neuron }) => neuron.lifecycle === 'active' && neuron.regions.includes(id),
+    );
     const memberRevisions = Object.fromEntries(
         members.map(({ neuron, revision }) => [neuron.id, revision]),
     );

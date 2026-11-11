@@ -86,7 +86,11 @@ export async function runMaintenancePass(
                     ? await buildReviewBundle(currentRegion, all)
                     : ownBundle(
                           currentRegion,
-                          all.filter(({ neuron }) => neuron.regions.includes(task.region)),
+                          all.filter(
+                              ({ neuron }) =>
+                                  neuron.lifecycle === 'active' &&
+                                  neuron.regions.includes(task.region),
+                          ),
                       );
 
             const report = await saveReportUnlocked(

@@ -14,6 +14,8 @@ export interface NetworkEdgeData {
 }
 
 export function buildNetworkModel(neurons: Neuron[], regions: Region[]) {
+    neurons = neurons.filter((neuron) => neuron.lifecycle === 'active');
+
     const nodes: NetworkNodeData[] = neurons.map(({ id, title, grounding, regions }) => ({
         id,
         title,

@@ -31,7 +31,9 @@ export async function buildReviewBundle(
     region: Region,
     snapshots: Snapshot[],
 ): Promise<ReviewBundle> {
-    const members = snapshots.filter(({ neuron }) => neuron.regions.includes(region.id));
+    const members = snapshots.filter(
+        ({ neuron }) => neuron.lifecycle === 'active' && neuron.regions.includes(region.id),
+    );
     const memberIds = new Set(members.map(({ neuron }) => neuron.id));
 
     const directIds = new Set(

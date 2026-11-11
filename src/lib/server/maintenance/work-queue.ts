@@ -80,7 +80,9 @@ export async function claimWork(config: MaintenanceConfig, mode: MaintenanceMode
 
         for (const region of regions) {
             const overview = await readRegionOverview(region.id, all);
-            const members = all.filter(({ neuron }) => neuron.regions.includes(region.id));
+            const members = all.filter(
+                ({ neuron }) => neuron.lifecycle === 'active' && neuron.regions.includes(region.id),
+            );
 
             for (const kind of ['overview', 'knowledge'] as const) {
                 if (mode !== 'all' && mode !== kind) {

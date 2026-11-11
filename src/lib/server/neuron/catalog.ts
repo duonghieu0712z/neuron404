@@ -71,12 +71,14 @@ export async function readCatalog(options: CatalogOptions = {}) {
             };
         }
 
+        const lifecycle = options.includeHistory ? sql`` : sql`WHERE lifecycle = 'active'`;
+
         const totals = await db.run(
-            sql`SELECT COUNT(*) AS total, SUM(CASE WHEN json_array_length(regions) = 0 THEN 1 ELSE 0 END) AS unfiled FROM neurons`,
+            sql`SELECT COUNT(*) AS total, SUM(CASE WHEN json_array_length(regions) = 0 THEN 1 ELSE 0 END) AS unfiled FROM neurons ${lifecycle}`,
         );
 
         const counts = await db.run(
-            sql`SELECT value AS region, COUNT(*) AS count FROM neurons, json_each(neurons.regions) GROUP BY value`,
+            sql`SELECT value AS region, COUNT(*) AS count FROM neurons, json_each(neurons.regions) ${lifecycle} GROUP BY value`,
         );
 
         const byRegion = new Map(counts.rows.map((row) => [String(row.region), Number(row.count)]));
