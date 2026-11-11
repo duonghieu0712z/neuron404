@@ -778,6 +778,8 @@
             regionContext.font = '500 12px "Inter Variable", sans-serif';
             regionContext.textBaseline = 'middle';
 
+            regionContext.save();
+            regionContext.setLineDash([14, 8]);
             for (const region of data.regions) {
                 const members = [...region.nodeIds, getRegionNodeId(region.id)].filter(
                     (id) => !sigmaInstance.getNodeState(id).isHidden,
@@ -828,6 +830,7 @@
                 regionContext.stroke();
                 regionContext.globalAlpha = 1;
             }
+            regionContext.restore();
             regionContext.save();
             regionContext.setLineDash([4, 5]);
             regionContext.lineWidth = 1;
@@ -1220,24 +1223,30 @@
                     title="Regions"
                     count={data.regions.length}
                     bind:open={sections.regions}
-                    class={sections.regions ? 'flex min-h-20 shrink-9999 flex-col' : 'shrink-0'}
+                    class={sections.regions && data.regions.length > 0
+                        ? 'flex min-h-20 shrink-9999 flex-col'
+                        : 'shrink-0'}
                     contentClass="flex min-h-0 flex-col"
                 >
-                    <ScrollArea class="network-panel-scroll flex max-h-48 min-h-0 flex-col">
-                        <div class="space-y-0.5 p-1">
-                            {#each data.regions as region (region.id)}
-                                <Button
-                                    variant={selectedRegionId === region.id ? 'secondary' : 'ghost'}
-                                    class="h-auto w-full justify-between gap-3 px-2 py-1.5 text-xs"
-                                    aria-pressed={selectedRegionId === region.id}
-                                    onclick={() => void panel.openRegion(region.id)}
-                                >
-                                    <span class="min-w-0 truncate">{region.title}</span>
-                                    <span class="tabular-nums">{region.nodeIds.length}</span>
-                                </Button>
-                            {/each}
-                        </div>
-                    </ScrollArea>
+                    {#if data.regions.length > 0}
+                        <ScrollArea class="network-panel-scroll flex max-h-48 min-h-0 flex-col">
+                            <div class="space-y-0.5 p-1">
+                                {#each data.regions as region (region.id)}
+                                    <Button
+                                        variant={selectedRegionId === region.id
+                                            ? 'secondary'
+                                            : 'ghost'}
+                                        class="h-auto w-full justify-between gap-3 px-2 py-1.5 text-xs"
+                                        aria-pressed={selectedRegionId === region.id}
+                                        onclick={() => void panel.openRegion(region.id)}
+                                    >
+                                        <span class="min-w-0 truncate">{region.title}</span>
+                                        <span class="tabular-nums">{region.nodeIds.length}</span>
+                                    </Button>
+                                {/each}
+                            </div>
+                        </ScrollArea>
+                    {/if}
                 </NetworkSection>
                 <div class="flex min-h-0 flex-col border-t pt-2">
                     <NetworkSection
