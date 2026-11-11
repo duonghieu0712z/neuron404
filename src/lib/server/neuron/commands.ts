@@ -4,6 +4,7 @@ import { classifiedNeuronInputSchema, updateNeuronInputSchema } from '#lib/neuro
 import { createDb } from '#lib/server/db/client';
 import { listReviewReports, readReport } from '#lib/server/maintenance/reports';
 import { createNeuron, updateNeuron } from '#lib/server/neuron/create';
+import { deleteNeuron } from '#lib/server/neuron/delete';
 import { ensureIndex, rebuildIndex, synchronizeIndex } from '#lib/server/neuron/indexer';
 import { lintNeurons } from '#lib/server/neuron/lint';
 import { migrateRegionStorage } from '#lib/server/neuron/migrate-regions';
@@ -18,7 +19,7 @@ import {
     readRegionSummary,
     writeRegionOverview,
 } from '#lib/server/neuron/region-overview';
-import { addRegion } from '#lib/server/neuron/regions';
+import { addRegion, updateRegion } from '#lib/server/neuron/regions';
 import { searchNeurons } from '#lib/server/neuron/search';
 import { readSource, saveSource } from '#lib/server/neuron/sources';
 import { normalizeSyncRegions } from '#lib/server/neuron/sync-scope';
@@ -41,6 +42,7 @@ export const REMOTE_WRITE_COMMANDS = [
     'add',
     'update',
     'region:add',
+    'region:update',
     'region:write',
     'source:add',
     'sync:write',
@@ -103,6 +105,8 @@ export async function executeNeuronCommand(command: string, args: string[], payl
         }
     } else if (command === 'region:add') {
         result = await addRegion(payload);
+    } else if (command === 'region:update') {
+        result = await updateRegion(args[0], payload);
     } else if (command === 'region:read') {
         result = args.includes('--summary')
             ? await readRegionSummary(args[0])
@@ -122,12 +126,14 @@ export async function executeNeuronCommand(command: string, args: string[], payl
         result = await readSource(args[0]);
     } else if (command === 'lint') {
         result = await lintNeurons();
-    } else if (['add', 'update', 'search', 'index', 'migrate'].includes(command)) {
+    } else if (['add', 'update', 'delete', 'search', 'index', 'migrate'].includes(command)) {
         const db = createDb();
         try {
             if (command === 'migrate') {
                 await migrate(db, { migrationsFolder: './drizzle' });
                 result = { ...(await migrateRegionStorage()), ...(await synchronizeIndex(db)) };
+            } else if (command === 'delete') {
+                result = await deleteNeuron(db, args[0], payload);
             } else if (command === 'add' || command === 'update') {
                 const saved =
                     command === 'add'
@@ -161,7 +167,7 @@ export async function executeNeuronCommand(command: string, args: string[], payl
         }
     } else {
         throw new Error(
-            'Usage: neuron <add|update ID|search QUERY [--region ID] [--limit N] [--offset N] [--include-history]|read ID...|neighbors ID [--kind KIND] [--direction incoming|outgoing|both] [--limit N] [--offset N]|history ID [REVISION]|catalog [--query QUERY] [--region ID] [--limit N] [--offset N]|region:add|region:read ID|region:write ID|review:reports|review:read ID|source:add|source:read ID|index [--rebuild]|migrate|lint>',
+            'Usage: neuron <add|update ID|delete ID|search QUERY [--region ID] [--limit N] [--offset N] [--include-history]|read ID...|neighbors ID [--kind KIND] [--direction incoming|outgoing|both] [--limit N] [--offset N]|history ID [REVISION]|catalog [--query QUERY] [--region ID] [--limit N] [--offset N]|region:add|region:update ID|region:read ID|region:write ID|review:reports|review:read ID|source:add|source:read ID|index [--rebuild]|migrate|lint>',
         );
     }
     return result;

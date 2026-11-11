@@ -8,7 +8,17 @@ import { parseSyncOptions, synchronizeRemote } from '#lib/server/neuron/sync';
 const [command, ...args] = process.argv.slice(2);
 try {
     let payload: unknown;
-    if (['add', 'update', 'source:add', 'region:add', 'region:write'].includes(command)) {
+    if (
+        [
+            'add',
+            'update',
+            'delete',
+            'source:add',
+            'region:add',
+            'region:update',
+            'region:write',
+        ].includes(command)
+    ) {
         const chunks: Buffer[] = [];
         for await (const chunk of process.stdin) {
             chunks.push(chunk as Buffer);

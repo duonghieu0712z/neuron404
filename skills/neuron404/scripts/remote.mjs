@@ -5,7 +5,15 @@ import process from 'node:process';
 import { requestRemote } from './transport.mjs';
 
 const MAX_BODY_BYTES = 1024 * 1024;
-const writes = new Set(['add', 'update', 'region:add', 'region:write', 'source:add', 'sync:write']);
+const writes = new Set([
+    'add',
+    'update',
+    'region:add',
+    'region:update',
+    'region:write',
+    'source:add',
+    'sync:write',
+]);
 const reads = new Set([
     'read',
     'neighbors',
