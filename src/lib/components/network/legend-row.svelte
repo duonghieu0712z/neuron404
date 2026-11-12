@@ -31,5 +31,5 @@
         ></span>
     </span>
     <span class="min-w-0 flex-1 text-muted-foreground">{label}</span>
-    <span class="tabular-nums">{count}</span>
+    <span class="text-muted-foreground tabular-nums">{count}</span>
 </div>

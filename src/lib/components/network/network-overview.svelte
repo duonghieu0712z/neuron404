@@ -41,6 +41,10 @@
 
     const panel = getNeuronPanelContext();
 
+    function displayLabel(value: string) {
+        return value.charAt(0).toUpperCase() + value.slice(1);
+    }
+
     const networkSummary = $derived(
         [
             ...(!overviewOpen ? [`${data.regions.length} regions`] : []),
@@ -155,7 +159,7 @@
                                 <div class="space-y-1.5 px-2 py-1.5">
                                     {#each GROUNDING_LEVELS as grounding (grounding)}
                                         {@render legendRow(
-                                            grounding,
+                                            displayLabel(grounding),
                                             groundingCounts[grounding],
                                             'circle',
                                             GROUNDING_COLORS[grounding][theme],
@@ -177,7 +181,7 @@
                                         'line',
                                     )}
                                     {@render legendRow(
-                                        'Dashed · Region membership',
+                                        'Dashed · region membership',
                                         membershipCount,
                                         'dashed',
                                         REGION_COLOR[theme],
@@ -191,7 +195,7 @@
                                 <div class="space-y-1.5 px-2 py-1.5">
                                     {#each SYNAPSE_KINDS as kind (kind)}
                                         {@render legendRow(
-                                            kind,
+                                            displayLabel(kind),
                                             synapseCounts[kind],
                                             'line',
                                             SYNAPSE_COLORS[kind][theme],
@@ -207,7 +211,7 @@
                 <div class="shrink-0 space-y-1 border-t px-2 pt-3">
                     <p class="text-sm font-medium">{focusedNode.title}</p>
                     <p class="text-xs text-muted-foreground">
-                        {focusedNode.grounding} · {connectionCount} synapses
+                        {displayLabel(focusedNode.grounding)} · {connectionCount} synapses
                     </p>
                     <div class="flex flex-wrap gap-1 pt-1" aria-label="Regions">
                         {#each data.regions.filter( (region) => region.nodeIds.includes(focusedNode.id) ) as region (region.id)}
