@@ -5,6 +5,7 @@ import Sigma, { DEFAULT_DEPTH_LAYERS, DEFAULT_STYLES } from 'sigma';
 import { layerPlain, sdfCircle } from 'sigma/rendering';
 
 import { getEdgeAppearance } from './edge-appearance';
+import { createDimmedNodeColors } from './node-appearance';
 import { regionHexagon } from './region-node';
 
 export function createSigmaRenderer(
@@ -15,6 +16,10 @@ export function createSigmaRenderer(
 ) {
     const foreground = isDark ? '#e5e7eb' : '#272d38';
     const surface = isDark ? '#20242c' : '#ffffff';
+    const dimmedColors = createDimmedNodeColors(
+        network.mapNodes((id, attributes) => attributes.color as string),
+        getComputedStyle(container).getPropertyValue('--background').trim(),
+    );
 
     return new Sigma(network, container, {
         primitives: {
@@ -35,6 +40,7 @@ export function createSigmaRenderer(
         settings: {
             autoRescale: 'once',
             enableNodeDrag: true,
+            enableEdgeEvents: true,
             nodeLabelEvents: 'extend',
             labelRenderedSizeThreshold: 0,
             minCameraRatio: 0.15,
@@ -42,6 +48,9 @@ export function createSigmaRenderer(
             stagePadding: 80,
         },
         styles: {
+            stage: {
+                cursor: { whenState: 'isDragging', then: 'grabbing', else: 'default' },
+            },
             edges: { ...DEFAULT_STYLES.edges, opacity: 1 },
             nodes: {
                 ...DEFAULT_STYLES.nodes,
@@ -56,16 +65,35 @@ export function createSigmaRenderer(
                 backdropCornerRadius: 4,
                 backdropShadowBlur: 8,
                 backdropShadowColor: isDark ? '#00000066' : '#00000012',
-                cursor: { whenState: 'isDragged', then: 'grabbing', else: 'grab' },
+                cursor: { whenState: 'isDragged', then: 'grabbing', else: 'pointer' },
+                labelCursor: { whenState: 'isDragged', then: 'grabbing', else: 'pointer' },
             },
         },
         nodeReducer: (id, attributes, nodeAttributes) => {
             const expanded = id === state.activeNode || id === state.selectedNode;
             const searchDimmed = !state.matchesSearch(id) && !expanded;
+            const dimmedColor = dimmedColors.get(attributes.color);
 
             const labelDepth = (
                 ['nodes', 'regionLabels', 'selectedLabels', 'hoveredLabels'] as const
             )[state.focusPriority(id)];
+
+            if (state.activeEdge || state.activeMembership) {
+                const highlighted = state.edgeEndpoints.has(id);
+                const placement = state.labelPlacements.get(id);
+
+                return {
+                    color: highlighted ? attributes.color : dimmedColor,
+                    opacity: 1,
+                    label: nodeAttributes.label,
+                    labelVisibility: highlighted && placement ? 'visible' : 'hidden',
+                    labelPosition: placement ?? 'below',
+                    labelDepth,
+                    depth: highlighted ? labelDepth : 'nodes',
+                    backdropArea: 'both',
+                    backdropVisibility: highlighted && placement ? 'visible' : 'hidden',
+                };
+            }
 
             if (state.regionByNodeId.has(id)) {
                 return {
@@ -75,14 +103,20 @@ export function createSigmaRenderer(
                     labelPosition: 'below',
                     labelDepth,
                     depth: expanded ? labelDepth : 'nodes',
-                    opacity: searchDimmed ? 0.2 : 1,
+                    color: searchDimmed ? dimmedColor : attributes.color,
+                    opacity: 1,
                     backdropArea: 'both',
                     backdropVisibility: expanded ? 'visible' : 'hidden',
                 };
             }
 
             if (searchDimmed) {
-                return { ...attributes, opacity: 0.2, labelVisibility: 'hidden' };
+                return {
+                    ...attributes,
+                    color: dimmedColor,
+                    opacity: 1,
+                    labelVisibility: 'hidden',
+                };
             }
 
             const label = expanded
@@ -105,7 +139,7 @@ export function createSigmaRenderer(
             }
 
             if (!state.neighborhood.has(id) && id !== state.selectedNode) {
-                return { opacity: 0.2, labelVisibility: 'hidden' };
+                return { color: dimmedColor, opacity: 1, labelVisibility: 'hidden' };
             }
 
             return {
@@ -122,6 +156,18 @@ export function createSigmaRenderer(
         edgeReducer: (id, attributes) => {
             const source = network.source(id);
             const target = network.target(id);
+
+            if (state.activeEdge || state.activeMembership) {
+                const highlighted = id === state.activeEdge;
+
+                return {
+                    ...getEdgeAppearance(
+                        network.getEdgeAttribute(id, 'color'),
+                        highlighted ? 1 : 0.12,
+                    ),
+                    size: highlighted ? 3 : 1,
+                };
+            }
 
             if (state.searchMatches !== null) {
                 const matched = state.matchesSearch(source) && state.matchesSearch(target);

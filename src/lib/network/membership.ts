@@ -1,3 +1,5 @@
+import type { MembershipLink } from './membership-hover';
+
 import { getRegionNodeId } from './region-node';
 
 export type MembershipMode = 'hidden' | 'auto' | 'all';
@@ -17,6 +19,7 @@ export function getVisibleMembershipLinks(
     mode: MembershipMode,
     active: string | null,
     selected: string | null,
+    hovered: MembershipLink | null = null,
 ) {
     if (mode === 'hidden') {
         return [];
@@ -28,6 +31,7 @@ export function getVisibleMembershipLinks(
         return region.nodeIds
             .filter(
                 (id) =>
+                    (hovered?.source === center && hovered.target === id) ||
                     mode === 'all' ||
                     activeRegion ||
                     selectedRegion ||
@@ -37,10 +41,11 @@ export function getVisibleMembershipLinks(
             .map((id) => ({
                 source: center,
                 target: id,
-                emphasized:
-                    activeRegion ||
-                    id === active ||
-                    (!active && (selectedRegion || id === selected)),
+                emphasized: hovered
+                    ? hovered.source === center && hovered.target === id
+                    : activeRegion ||
+                      id === active ||
+                      (!active && (selectedRegion || id === selected)),
             }));
     });
 }

@@ -1,5 +1,6 @@
 import type { LabelPlacement } from './labels';
 import type { MembershipMode } from './membership';
+import type { MembershipLink } from './membership-hover';
 import type { NetworkData } from './types';
 
 import { labelBox } from './labels';
@@ -12,6 +13,9 @@ export function createRenderState(data: NetworkData, membership: MembershipMode)
 
     const state = {
         activeNode: null as string | null,
+        activeEdge: null as string | null,
+        activeMembership: null as MembershipLink | null,
+        edgeEndpoints: new Set<string>(),
         selectedNode: null as string | null,
         neuronLabelsVisible: true,
         visibleMembershipMode: membership,
@@ -32,7 +36,7 @@ export function createRenderState(data: NetworkData, membership: MembershipMode)
             return region ? region.nodeIds.some((member) => matches.has(member)) : matches.has(id);
         },
         focusPriority(id: string) {
-            if (id === state.activeNode) {
+            if (state.edgeEndpoints.has(id) || id === state.activeNode) {
                 return 3;
             }
 

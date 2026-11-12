@@ -1,9 +1,11 @@
+import type { MembershipLink, MembershipSegment } from './membership-hover';
 import type { RenderState } from './render-state';
 import type { NetworkData, NetworkTheme } from './types';
 import type Sigma from 'sigma';
 
 import { REGION_COLOR } from './appearance';
 import { getVisibleMembershipLinks } from './membership';
+import { createMembershipHover } from './membership-hover';
 import { getRegionNodeId } from './region-node';
 import { getRegionHull } from './regions';
 
@@ -13,11 +15,13 @@ export function createRegionLayer(
     state: RenderState,
     theme: NetworkTheme,
     regionCanvas: HTMLCanvasElement,
+    onHover: (link: MembershipLink | null) => void,
 ) {
     const network = sigmaInstance.getGraph();
     const regionContext = regionCanvas.getContext('2d');
     const isDark = theme === 'dark';
     const foreground = isDark ? '#e5e7eb' : '#272d38';
+    const hover = createMembershipHover(sigmaInstance, onHover, () => state.activeEdge !== null);
 
     const drawRegions = () => {
         if (!regionContext) {
@@ -113,11 +117,14 @@ export function createRegionLayer(
         regionContext.lineWidth = 1;
         regionContext.strokeStyle = REGION_COLOR[theme];
 
+        const segments: MembershipSegment[] = [];
+
         for (const link of getVisibleMembershipLinks(
             data.regions,
             state.visibleMembershipMode,
             state.activeNode,
             state.selectedNode,
+            state.activeMembership,
         )) {
             if (
                 sigmaInstance.getNodeState(link.source).isHidden ||
@@ -140,9 +147,29 @@ export function createRegionLayer(
                 continue;
             }
 
+            const segment = {
+                source: link.source,
+                target: link.target,
+                start: {
+                    x: start.x + (dx * sourceInset) / distance,
+                    y: start.y + (dy * sourceInset) / distance,
+                },
+                end: {
+                    x: end.x - (dx * targetInset) / distance,
+                    y: end.y - (dy * targetInset) / distance,
+                },
+            };
+            segments.push(segment);
+
+            const focused =
+                state.activeMembership?.source === link.source &&
+                state.activeMembership.target === link.target;
+            regionContext.lineWidth = focused ? 2.5 : 1;
             let opacity = 0.3;
 
-            if (link.emphasized) {
+            if (state.activeMembership || state.activeEdge) {
+                opacity = focused ? 0.95 : 0.12;
+            } else if (link.emphasized) {
                 opacity = 0.6;
             } else if (state.activeNode || state.selectedNode) {
                 opacity = 0.16;
@@ -155,21 +182,19 @@ export function createRegionLayer(
                     ? 1
                     : 0.2);
             regionContext.beginPath();
-            regionContext.moveTo(
-                start.x + (dx * sourceInset) / distance,
-                start.y + (dy * sourceInset) / distance,
-            );
-            regionContext.lineTo(
-                end.x - (dx * targetInset) / distance,
-                end.y - (dy * targetInset) / distance,
-            );
+            regionContext.moveTo(segment.start.x, segment.start.y);
+            regionContext.lineTo(segment.end.x, segment.end.y);
             regionContext.stroke();
         }
 
         regionContext.restore();
+        hover.updateSegments(segments);
     };
 
     sigmaInstance.on('afterRender', drawRegions);
     sigmaInstance.scheduleRender();
-    return () => sigmaInstance.off('afterRender', drawRegions);
+    return () => {
+        hover.dispose();
+        sigmaInstance.off('afterRender', drawRegions);
+    };
 }

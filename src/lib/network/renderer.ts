@@ -1,3 +1,4 @@
+import type { MembershipLink } from './membership-hover';
 import type { NetworkData, NetworkPositions, NetworkTheme } from './types';
 
 import { REGION_COLOR, SYNAPSE_COLORS } from './appearance';
@@ -38,18 +39,31 @@ export function createNetworkRenderer(options: RendererOptions) {
     });
     regionCanvas.setAttribute('aria-hidden', 'true');
     const disposeLabels = createLabelLayer(sigmaInstance, state, regionCanvas.getContext('2d'));
-    const disposeRegions = createRegionLayer(sigmaInstance, data, state, theme, regionCanvas);
+    const disposeRegions = createRegionLayer(
+        sigmaInstance,
+        data,
+        state,
+        theme,
+        regionCanvas,
+        (link) => setMembershipFocus(link),
+    );
     const synapseSignals = createSynapseSignals(sigmaInstance, () => state.signalLabelMasks);
+
+    const synapseEdgeIds = network.edges();
 
     const updateSignals = () => {
         synapseSignals.setLinks([
             ...simLinks.flatMap((link, index) => {
                 const connected =
-                    state.activeNode &&
-                    (state.regionByNodeId.has(state.activeNode)
-                        ? state.neighborhood.has(link.sourceId) &&
-                          state.neighborhood.has(link.targetId)
-                        : link.sourceId === state.activeNode || link.targetId === state.activeNode);
+                    !state.activeMembership &&
+                    (state.activeEdge
+                        ? synapseEdgeIds[index] === state.activeEdge
+                        : state.activeNode &&
+                          (state.regionByNodeId.has(state.activeNode)
+                              ? state.neighborhood.has(link.sourceId) &&
+                                state.neighborhood.has(link.targetId)
+                              : link.sourceId === state.activeNode ||
+                                link.targetId === state.activeNode));
 
                 return connected &&
                     (state.searchMatches === null ||
@@ -71,8 +85,9 @@ export function createNetworkRenderer(options: RendererOptions) {
                 state.visibleMembershipMode,
                 state.activeNode,
                 state.selectedNode,
+                state.activeMembership,
             )
-                .filter((link) => link.emphasized)
+                .filter((link) => !state.activeEdge && link.emphasized)
                 .map((link) => ({
                     id: `membership:${link.source}:${link.target}`,
                     source: link.source,
@@ -84,6 +99,9 @@ export function createNetworkRenderer(options: RendererOptions) {
 
     const setMembership = (mode: MembershipMode) => {
         state.visibleMembershipMode = mode;
+        if (mode === 'hidden') {
+            setMembershipFocus(null);
+        }
         updateSignals();
         sigmaInstance.scheduleRender();
     };
@@ -128,7 +146,42 @@ export function createNetworkRenderer(options: RendererOptions) {
         sigmaInstance.refresh();
     };
 
-    sigmaInstance.on('enterNode', ({ node }) => options.onHover(node));
+    const setMembershipFocus = (link: MembershipLink | null) => {
+        if (
+            state.activeMembership?.source === link?.source &&
+            state.activeMembership?.target === link?.target
+        ) {
+            return;
+        }
+
+        state.activeMembership = link;
+        let endpoints: string[] = [];
+        if (link) {
+            endpoints = [link.source, link.target];
+        } else if (state.activeEdge) {
+            endpoints = network.extremities(state.activeEdge);
+        }
+        state.edgeEndpoints = new Set(endpoints);
+        updateSignals();
+        sigmaInstance.refresh();
+    };
+
+    const setEdgeFocus = (edge: string | null) => {
+        state.activeEdge = edge;
+        if (edge) {
+            state.activeMembership = null;
+        }
+        state.edgeEndpoints = new Set(edge ? network.extremities(edge) : []);
+        updateSignals();
+        sigmaInstance.refresh();
+    };
+
+    sigmaInstance.on('enterEdge', ({ edge }) => setEdgeFocus(edge));
+    sigmaInstance.on('leaveEdge', () => setEdgeFocus(null));
+    sigmaInstance.on('enterNode', ({ node }) => {
+        setMembershipFocus(null);
+        options.onHover(node);
+    });
     sigmaInstance.on('leaveNode', () => options.onHover(null));
     const motion = createRendererMotion(sigmaInstance, graph, positions, synapseSignals);
     sigmaInstance.on('clickNode', ({ node, event }) => {

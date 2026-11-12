@@ -39,20 +39,26 @@ export function createLabelLayer(
             .filter(
                 (id) =>
                     !sigmaInstance.getNodeState(id).isHidden &&
-                    (state.regionByNodeId.has(id) ||
-                        id === state.activeNode ||
-                        id === state.selectedNode ||
-                        (state.neuronLabelsVisible &&
-                            state.matchesSearch(id) &&
-                            (state.searchMatches !== null ||
-                                !state.activeNode ||
-                                state.neighborhood.has(id) ||
-                                id === state.selectedNode))),
+                    (state.activeEdge || state.activeMembership
+                        ? state.edgeEndpoints.has(id)
+                        : state.regionByNodeId.has(id) ||
+                          id === state.activeNode ||
+                          id === state.selectedNode ||
+                          (state.neuronLabelsVisible &&
+                              state.matchesSearch(id) &&
+                              (state.searchMatches !== null ||
+                                  !state.activeNode ||
+                                  state.neighborhood.has(id) ||
+                                  id === state.selectedNode))),
             )
             .map((id) => {
                 const attributes = network.getNodeAttributes(id);
                 const isRegion = state.regionByNodeId.has(id);
-                const expanded = isRegion || id === state.activeNode || id === state.selectedNode;
+                const expanded =
+                    state.edgeEndpoints.has(id) ||
+                    isRegion ||
+                    id === state.activeNode ||
+                    id === state.selectedNode;
 
                 if (state.compactLabels[id] === undefined) {
                     let compact: string = attributes.shortLabel;
