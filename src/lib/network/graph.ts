@@ -10,6 +10,7 @@ import {
     SYNAPSE_COLORS,
 } from './appearance';
 import { getEdgeAppearance } from './edge-appearance';
+import { prepareNetworkPositions } from './position-updates';
 import { getRegionNodeId } from './region-node';
 import { createNetworkSimulation, getNodeEntranceOffset } from './simulation';
 
@@ -19,6 +20,8 @@ export function createNetworkGraph(
     theme: NetworkTheme,
     motionEnabled: boolean,
 ) {
+    prepareNetworkPositions(data, positions);
+
     const nodeIds = new Set(data.nodes.map((node) => node.id));
 
     const visualNodes: SimNode[] = [
@@ -78,6 +81,7 @@ export function createNetworkGraph(
         const entrance = entranceActive
             ? getNodeEntranceOffset(node.index ?? 0, 0)
             : { x: 0, y: 0 };
+
         network.addNode(node.id, {
             color: node.regionId
                 ? REGION_COLOR[theme]
@@ -93,6 +97,7 @@ export function createNetworkGraph(
 
     for (const link of simLinks) {
         const color = SYNAPSE_COLORS[link.kind as keyof typeof SYNAPSE_COLORS][theme];
+
         network.addEdge(link.sourceId, link.targetId, {
             color,
             kind: link.kind,

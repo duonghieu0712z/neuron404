@@ -1,15 +1,17 @@
 <script lang="ts">
     import type { PageProps } from './$types';
+    import type { NetworkData } from '#lib/network/types';
     import type Sigma from 'sigma';
+    import type { CameraState } from 'sigma/types';
 
-    import { invalidateAll } from '$app/navigation';
+    import { resolve } from '$app/paths';
     import { page } from '$app/state';
     import { mode } from 'mode-watcher';
-    import { tick, untrack } from 'svelte';
+    import { untrack } from 'svelte';
 
     import NetworkControls from '#lib/components/network/network-controls.svelte';
     import NetworkOverview from '#lib/components/network/network-overview.svelte';
-    import { fitNetworkInView } from '#lib/network/camera';
+    import { createNetworkLiveUpdates } from '#lib/network/live-updates';
     import { type MembershipMode } from '#lib/network/membership';
     import { createNetworkPreferences } from '#lib/network/preferences.svelte';
     import { getRegionNodeId } from '#lib/network/region-node';
@@ -18,6 +20,13 @@
     import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
     let { data }: PageProps = $props();
+
+    let liveNetwork = $state.raw<NetworkData | null>(null);
+
+    const network = $derived(liveNetwork ?? data.network);
+
+    let updatesFailed = $state(false);
+    let refreshSnapshot = $state<(() => Promise<void>) | null>(null);
 
     const preferences = createNetworkPreferences();
     const panel = getNeuronPanelContext();
@@ -28,50 +37,69 @@
 
     const search = createNetworkSearch(
         () => networkQuery,
-        () => data.nodes,
+        () => network.nodes,
     );
 
     let applyFilter = $state<((ids: Set<string> | null) => void) | null>(null);
 
     const theme = $derived(mode.current === 'dark' ? 'dark' : 'light');
+
     let containerEl = $state<HTMLDivElement>();
     let renderer = $state.raw<Sigma | null>(null);
     let hoveredNode = $state<string | null>(null);
+
     const selectedRegionId = $derived(panel.region?.region.id ?? null);
+
     let applyMembership = $state<((mode: MembershipMode) => void) | null>(null);
     let reducedMotion = $state(false);
     let applyMotion = $state<((enabled: boolean) => void) | null>(null);
     let applyLabels = $state<((visible: boolean) => void) | null>(null);
     let applyFocus = $state<((id: string | null, selected: string | null) => void) | null>(null);
-    let layoutRevision = $state(0);
     let refreshing = $state(false);
+
     const positions: Record<string, { x: number; y: number } | undefined> = {};
 
-    async function refreshNetwork() {
-        if (refreshing) {
-            return;
-        }
+    $effect(() => {
+        const revision = data.revision;
 
+        liveNetwork = null;
+
+        const updates = createNetworkLiveUpdates({
+            url: resolve('/network/snapshot'),
+            revision,
+            onUpdate: (value) => {
+                liveNetwork = value;
+            },
+            onError: (failed) => {
+                updatesFailed = failed;
+            },
+        });
+
+        refreshSnapshot = updates.refresh;
+
+        return () => {
+            updates.dispose();
+            refreshSnapshot = null;
+        };
+    });
+
+    async function refreshNetwork() {
         refreshing = true;
 
         try {
-            await invalidateAll();
-
-            for (const id of Object.keys(positions)) {
-                delete positions[id];
-            }
-
-            layoutRevision++;
-            await tick();
-            renderer?.refresh();
-            fitNetworkInView(renderer);
+            await refreshSnapshot?.();
         } finally {
             refreshing = false;
         }
     }
 
+    let view: {
+        camera: CameraState;
+        bounds: ReturnType<Sigma['getBBox']>;
+    } | null = null;
+
     const focusedRegion = $derived(
-        data.regions.find((region) =>
+        network.regions.find((region) =>
             hoveredNode
                 ? getRegionNodeId(region.id) === hoveredNode
                 : region.id === selectedRegionId,
@@ -79,12 +107,12 @@
     );
 
     const focusedNode = $derived(
-        data.nodes.find((node) => node.id === (hoveredNode ?? panel.selected?.neuron.id)),
+        network.nodes.find((node) => node.id === (hoveredNode ?? panel.selected?.neuron.id)),
     );
 
     const connectionCount = $derived(
         focusedNode
-            ? data.edges.filter(
+            ? network.edges.filter(
                   (edge) => edge.source === focusedNode.id || edge.target === focusedNode.id,
               ).length
             : 0,
@@ -92,11 +120,13 @@
 
     $effect(() => {
         applyFilter?.(search.ids);
+
         const selected = selectedRegionId
             ? getRegionNodeId(selectedRegionId)
             : (panel.selected?.neuron.id ?? null);
 
         const searchOwnsFocus = networkQuery.length > 0 && !search.error;
+
         applyFocus?.(
             searchOwnsFocus ? hoveredNode : (hoveredNode ?? selected),
             searchOwnsFocus ? null : selected,
@@ -120,6 +150,7 @@
 
         updatePreference();
         media.addEventListener('change', updatePreference);
+
         return () => media.removeEventListener('change', updatePreference);
     });
 
@@ -128,14 +159,16 @@
     });
 
     $effect(() => {
-        if (!preferences.ready || !containerEl || data.nodes.length === 0) {
+        if (!preferences.ready || !containerEl || network.nodes.length === 0) {
             return;
         }
 
-        void layoutRevision;
+        if (!network.nodes.some((node) => positions[node.id])) {
+            view = null;
+        }
 
         const runtime = createNetworkRenderer({
-            data,
+            data: network,
             container: containerEl,
             positions,
             theme: mode.current === 'dark' ? 'dark' : 'light',
@@ -148,6 +181,13 @@
             onOpenRegion: panel.openRegion,
             onClose: panel.close,
         });
+
+        if (view) {
+            runtime.renderer.setCustomBBox(view.bounds);
+            runtime.renderer.refresh();
+            runtime.renderer.getCamera().setState(view.camera);
+        }
+
         renderer = runtime.renderer;
         applyMembership = runtime.setMembership;
         applyLabels = runtime.setLabels;
@@ -156,7 +196,17 @@
         applyMotion = runtime.setMotion;
 
         return () => {
+            const current = runtime.renderer;
+
+            view = {
+                camera: current.getCamera().getState(),
+                bounds: current.getCustomBBox() ?? current.getBBox(),
+            };
+            current.getGraph().forEachNode((id, attributes) => {
+                positions[id] = { x: attributes.x, y: attributes.y };
+            });
             runtime.dispose();
+            hoveredNode = null;
             applyMotion = null;
             applyFocus = null;
             applyFilter = null;
@@ -176,7 +226,7 @@
     aria-label="Knowledge network"
     data-neuron-surface
 >
-    {#if data.nodes.length === 0}
+    {#if network.nodes.length === 0}
         <div class="flex h-full items-center justify-center">
             <p class="text-sm text-muted-foreground">
                 Saved neurons and their connections will appear here.
@@ -189,6 +239,15 @@
             class="absolute inset-0"
             aria-label="Interactive neuron network"
         ></div>
+    {/if}
+
+    {#if updatesFailed}
+        <p
+            class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-sm bg-card/95 px-3 py-2 text-xs text-muted-foreground"
+            role="status"
+        >
+            Live updates unavailable. Retrying…
+        </p>
     {/if}
 
     {#if search.error || search.searching || (networkQuery && search.ids?.size === 0)}
@@ -204,7 +263,7 @@
     {/if}
 
     <NetworkOverview
-        {data}
+        data={network}
         {theme}
         bind:overviewOpen={preferences.overviewOpen}
         bind:sections={preferences.sections}
