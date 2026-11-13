@@ -24,6 +24,10 @@
 
     const panel = getNeuronPanelContext();
 
+    const trailIndex = $derived(
+        panel.readingTrail?.steps.findIndex((step) => step.id === data.neuron.id) ?? -1,
+    );
+
     function handleSynapseClick(event: MouseEvent, id: string) {
         if (!onSelectNeuron) {
             return;
@@ -58,6 +62,42 @@
 {/snippet}
 
 {#snippet body()}
+    {#if panel.readingTrail && trailIndex >= 0}
+        <nav
+            class="space-y-2 rounded-sm border p-3 text-sm"
+            aria-label="Reading path navigation"
+            data-neuron-trigger
+        >
+            <p>
+                {panel.readingTrail.title} · Step {trailIndex + 1} of {panel.readingTrail.steps
+                    .length}
+            </p>
+
+            {#if panel.readingTrail.steps[trailIndex].purpose}
+                <p class="text-muted-foreground">
+                    {panel.readingTrail.steps[trailIndex].purpose}
+                </p>
+            {/if}
+            <div class="flex gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={trailIndex === 0}
+                    onclick={() => panel.startReading(panel.readingTrail!, trailIndex - 1)}
+                >
+                    Previous
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={trailIndex === panel.readingTrail.steps.length - 1}
+                    onclick={() => panel.startReading(panel.readingTrail!, trailIndex + 1)}
+                >
+                    Next
+                </Button>
+            </div>
+        </nav>
+    {/if}
     <Card size={layout === 'panel' ? 'sm' : 'default'}>
         <CardContent>
             <MarkdownContent content={data.neuron.body} sources={data.sources} {onSelectNeuron} />

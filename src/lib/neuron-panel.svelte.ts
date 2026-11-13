@@ -7,7 +7,16 @@ import { getContext, setContext } from 'svelte';
 
 const KEY = Symbol('neuron-panel');
 
+export interface ReadingTrail {
+    regionId: string;
+    title: string;
+    steps: { id: string; title: string; purpose: string }[];
+}
+
 export interface NeuronPanelContext {
+    readonly readingTrail: ReadingTrail | null;
+    startReading(trail: ReadingTrail, index: number): Promise<void>;
+
     readonly source: {
         snapshot: Awaited<ReturnType<typeof readSource>> | null;
         passage: string;
@@ -27,6 +36,7 @@ export interface NeuronPanelContext {
 export function createNeuronPanelContext(): NeuronPanelContext {
     let selected = $state<NeuronDetail | null>(null);
     let region = $state<RegionOverview | null>(null);
+    let readingTrail = $state<ReadingTrail | null>(null);
 
     let requestId = 0;
     let sourceRequest = 0;
@@ -67,8 +77,21 @@ export function createNeuronPanelContext(): NeuronPanelContext {
         source = null;
     }
 
+    async function startReading(trail: ReadingTrail, index: number) {
+        if (!trail.steps[index]) {
+            return;
+        }
+
+        readingTrail = trail;
+        await open(trail.steps[index].id);
+    }
+
     async function open(id: string) {
         closeSource();
+
+        if (!readingTrail?.steps.some((step) => step.id === id)) {
+            readingTrail = null;
+        }
 
         const currentRequest = ++requestId;
         const href = resolve('/neurons/[id]/panel', { id });
@@ -88,6 +111,7 @@ export function createNeuronPanelContext(): NeuronPanelContext {
 
     async function openRegion(id: string) {
         closeSource();
+        readingTrail = null;
 
         const currentRequest = ++requestId;
         const href = resolve('/neurons/regions/[id]/panel', { id });
@@ -108,11 +132,16 @@ export function createNeuronPanelContext(): NeuronPanelContext {
     function close() {
         requestId++;
         closeSource();
+        readingTrail = null;
         selected = null;
         region = null;
     }
 
     const context: NeuronPanelContext = {
+        get readingTrail() {
+            return readingTrail;
+        },
+        startReading,
         get source() {
             return source;
         },
