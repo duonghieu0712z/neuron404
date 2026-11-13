@@ -2,7 +2,7 @@ import type { Handle } from '@sveltejs/kit/hooks';
 
 import process from 'node:process';
 
-import { json, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 
 import {
     apiPermission,
@@ -17,11 +17,13 @@ export const handle: Handle = async ({ event, resolve }) => {
     const publicAsset =
         pathname.startsWith('/_app/') ||
         ['/favicon.ico', '/apple-touch-icon.png'].includes(pathname);
+
     if (pathname === '/healthz' || publicAsset) {
         return resolve(event);
     }
 
     let enabled: boolean;
+
     try {
         enabled = authConfiguration().enabled;
     } catch {
@@ -32,6 +34,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     const publicUrl = process.env.NEURON404_PUBLIC_URL;
+
     if (publicUrl && event.url.origin !== new URL(publicUrl).origin) {
         return new Response('Invalid request origin.', {
             status: 400,
@@ -41,18 +44,21 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     if (api) {
         if (!enabled) {
-            return json(
+            return Response.json(
                 { error: 'Remote API is disabled. Configure server authentication.' },
                 { status: 503 },
             );
         }
+
         const permission = apiPermission(event.request.headers.get('authorization'));
+
         if (!permission) {
-            return json(
+            return Response.json(
                 { error: 'Authentication required.' },
                 { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } },
             );
         }
+
         event.locals.apiPermission = permission;
     } else if (
         enabled &&
@@ -63,8 +69,10 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     const response = await resolve(event);
+
     response.headers.set('Cache-Control', 'no-store');
     response.headers.set('Referrer-Policy', 'same-origin');
     response.headers.set('X-Content-Type-Options', 'nosniff');
+
     return response;
 };
