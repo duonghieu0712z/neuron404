@@ -22,12 +22,15 @@ function searchQuery(query: string, options: SearchOptions = {}) {
     const tokens = [...new Set(query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])].filter(
         (word) => !STOP_WORDS.has(fold(word)),
     );
+
     if (!tokens.length) {
         return null;
     }
+
     if (tokens.length > 24) {
         throw new Error('Search accepts at most 24 distinct terms. Use a more specific query.');
     }
+
     const matchQuery = tokens.map((token) => `"${token}"*`).join(' OR ');
     const matches = sql.join(
         tokens.map(
@@ -42,6 +45,7 @@ function searchQuery(query: string, options: SearchOptions = {}) {
         ? sql`AND EXISTS (SELECT 1 FROM json_each(n.regions) WHERE value = ${options.region})`
         : sql``;
     const lifecycleFilter = options.includeHistory ? sql`` : sql`AND n.lifecycle = 'active'`;
+
     return {
         tokens,
         coverage: sql`WITH term_matches AS (${matches}), coverage AS (
@@ -54,14 +58,17 @@ function searchQuery(query: string, options: SearchOptions = {}) {
 
 export async function searchNeuronIds(db: Db, query: string) {
     const search = searchQuery(query);
+
     if (!search) {
         return [];
     }
+
     const result = await db.run(sql`${search.coverage}
         SELECT f.id FROM neurons_fts AS f JOIN neurons AS n ON n.id = f.id
         JOIN coverage AS c ON c.neuron_rowid = f.rowid
-        ${search.filter} ORDER BY f.id
+        ${search.filter} ORDER BY c.matched DESC, bm25(neurons_fts, 0, 8, 1, 5, 6), f.id
     `);
+
     return result.rows.map((row) => String(row.id));
 }
 
@@ -74,14 +81,19 @@ export async function searchNeurons(
     if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
         throw new Error('Search limit must be an integer from 1 to 50');
     }
+
     const offset = options.offset ?? 0;
+
     if (!Number.isInteger(offset) || offset < 0) {
         throw new Error('Search offset must be a nonnegative integer');
     }
+
     const search = searchQuery(query, options);
+
     if (!search) {
         return [];
     }
+
     const { tokens } = search;
     const result = await db.run(sql`
         ${search.coverage}
@@ -100,6 +112,7 @@ export async function searchNeurons(
             .split(',')
             .map((index) => tokens[Number(index)]),
     }));
+
     return Promise.all(
         selected.map(async ({ row, matchedTerms }) => {
             const cautions = await db.run(sql`
@@ -114,6 +127,7 @@ export async function searchNeurons(
             SELECT id, title, lifecycle, revision, 'superseded-by' AS kind
             FROM neurons WHERE id = (SELECT superseded_by FROM neurons WHERE id = ${row.id})
         `);
+
             return {
                 id: String(row.id),
                 title: String(row.title),

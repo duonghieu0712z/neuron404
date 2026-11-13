@@ -4,6 +4,7 @@ export interface NetworkNodeData {
     id: string;
     title: string;
     grounding: string;
+    endorsement?: string;
     regions: string[];
 }
 
@@ -16,14 +17,18 @@ export interface NetworkEdgeData {
 export function buildNetworkModel(neurons: Neuron[], regions: Region[]) {
     neurons = neurons.filter((neuron) => neuron.lifecycle === 'active');
 
-    const nodes: NetworkNodeData[] = neurons.map(({ id, title, grounding, regions }) => ({
-        id,
-        title,
-        grounding,
-        regions,
-    }));
+    const nodes: NetworkNodeData[] = neurons.map(
+        ({ id, title, grounding, endorsement, regions }) => ({
+            id,
+            title,
+            grounding,
+            endorsement,
+            regions,
+        }),
+    );
     const ids = new Set(nodes.map((node) => node.id));
     const regionIds = new Set(regions.map((region) => region.id));
+
     for (const node of nodes) {
         for (const id of node.regions) {
             if (!regionIds.has(id)) {
@@ -31,6 +36,7 @@ export function buildNetworkModel(neurons: Neuron[], regions: Region[]) {
             }
         }
     }
+
     const edges: NetworkEdgeData[] = neurons.flatMap((neuron) =>
         neuron.synapses
             .filter((edge) => ids.has(edge.target))
@@ -45,6 +51,7 @@ export function buildNetworkModel(neurons: Neuron[], regions: Region[]) {
         }))
         .filter((region) => region.nodeIds.length > 0);
     const unfiled = nodes.filter((node) => node.regions.length === 0).map((node) => node.id);
+
     if (unfiled.length) {
         populatedRegions.push({
             id: 'region:unfiled',
@@ -53,6 +60,7 @@ export function buildNetworkModel(neurons: Neuron[], regions: Region[]) {
             nodeIds: unfiled,
         });
     }
+
     return {
         nodes,
         edges,

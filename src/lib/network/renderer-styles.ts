@@ -71,7 +71,8 @@ export function createSigmaRenderer(
         },
         nodeReducer: (id, attributes, nodeAttributes) => {
             const expanded = id === state.activeNode || id === state.selectedNode;
-            const searchDimmed = !state.matchesSearch(id) && !expanded;
+            const searchDimmed =
+                !state.matchesSearch(id) && !expanded && !state.neighborhood.has(id);
             const dimmedColor = dimmedColors.get(attributes.color);
 
             const labelDepth = (
@@ -128,7 +129,7 @@ export function createSigmaRenderer(
             const labelVisibility =
                 (state.neuronLabelsVisible || expanded) && placement ? 'visible' : 'hidden';
 
-            if (state.searchMatches !== null || !state.activeNode) {
+            if (!state.activeNode) {
                 return {
                     ...attributes,
                     label,
@@ -169,7 +170,7 @@ export function createSigmaRenderer(
                 };
             }
 
-            if (state.searchMatches !== null) {
+            if (state.searchMatches !== null && !state.activeNode) {
                 const matched = state.matchesSearch(source) && state.matchesSearch(target);
 
                 return {

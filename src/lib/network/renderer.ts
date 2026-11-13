@@ -37,7 +37,9 @@ export function createNetworkRenderer(options: RendererOptions) {
         beforeLayer: 'stage',
         style: { pointerEvents: 'none', left: '0', top: '0' },
     });
+
     regionCanvas.setAttribute('aria-hidden', 'true');
+
     const disposeLabels = createLabelLayer(sigmaInstance, state, regionCanvas.getContext('2d'));
     const disposeRegions = createRegionLayer(
         sigmaInstance,
@@ -67,6 +69,7 @@ export function createNetworkRenderer(options: RendererOptions) {
 
                 return connected &&
                     (state.searchMatches === null ||
+                        state.activeNode !== null ||
                         (state.matchesSearch(link.sourceId) && state.matchesSearch(link.targetId)))
                     ? [
                           {
@@ -99,9 +102,11 @@ export function createNetworkRenderer(options: RendererOptions) {
 
     const setMembership = (mode: MembershipMode) => {
         state.visibleMembershipMode = mode;
+
         if (mode === 'hidden') {
             setMembershipFocus(null);
         }
+
         updateSignals();
         sigmaInstance.scheduleRender();
     };
@@ -127,7 +132,9 @@ export function createNetworkRenderer(options: RendererOptions) {
             selected && network.hasNode(selected) && !sigmaInstance.getNodeState(selected).isHidden
                 ? selected
                 : null;
+
         const region = state.activeNode ? state.regionByNodeId.get(state.activeNode) : undefined;
+
         state.neighborhood = new Set<string>();
 
         if (state.activeNode) {
@@ -139,6 +146,7 @@ export function createNetworkRenderer(options: RendererOptions) {
                           .filter((item) => item.nodeIds.includes(state.activeNode!))
                           .map((item) => getRegionNodeId(item.id)),
                   ];
+
             state.neighborhood = new Set([state.activeNode, ...members]);
         }
 
@@ -155,12 +163,15 @@ export function createNetworkRenderer(options: RendererOptions) {
         }
 
         state.activeMembership = link;
+
         let endpoints: string[] = [];
+
         if (link) {
             endpoints = [link.source, link.target];
         } else if (state.activeEdge) {
             endpoints = network.extremities(state.activeEdge);
         }
+
         state.edgeEndpoints = new Set(endpoints);
         updateSignals();
         sigmaInstance.refresh();
@@ -168,9 +179,11 @@ export function createNetworkRenderer(options: RendererOptions) {
 
     const setEdgeFocus = (edge: string | null) => {
         state.activeEdge = edge;
+
         if (edge) {
             state.activeMembership = null;
         }
+
         state.edgeEndpoints = new Set(edge ? network.extremities(edge) : []);
         updateSignals();
         sigmaInstance.refresh();
@@ -183,9 +196,12 @@ export function createNetworkRenderer(options: RendererOptions) {
         options.onHover(node);
     });
     sigmaInstance.on('leaveNode', () => options.onHover(null));
+
     const motion = createRendererMotion(sigmaInstance, graph, positions, synapseSignals);
+
     sigmaInstance.on('clickNode', ({ node, event }) => {
         event.original.stopPropagation();
+
         const region = state.regionByNodeId.get(node);
 
         if (region) {
@@ -209,6 +225,7 @@ export function createNetworkRenderer(options: RendererOptions) {
 
         sigmaInstance.scheduleRender();
     });
+
     resizeObserver.observe(options.container);
 
     return {

@@ -11,6 +11,9 @@
 
     import NetworkControls from '#lib/components/network/network-controls.svelte';
     import NetworkOverview from '#lib/components/network/network-overview.svelte';
+    import NetworkSearchResults from '#lib/components/network/network-search-results.svelte';
+    import { focusNetworkNode } from '#lib/network/camera';
+    import { filterNetworkNodes, type NetworkFilters } from '#lib/network/filters';
     import { createNetworkLiveUpdates } from '#lib/network/live-updates';
     import { type MembershipMode } from '#lib/network/membership';
     import { createNetworkPreferences } from '#lib/network/preferences.svelte';
@@ -39,6 +42,10 @@
         () => networkQuery,
         () => network.nodes,
     );
+
+    let filters = $state<NetworkFilters>({ region: '', grounding: '', endorsement: '' });
+
+    const matches = $derived(filterNetworkNodes(network, search.ids, filters));
 
     let applyFilter = $state<((ids: Set<string> | null) => void) | null>(null);
 
@@ -119,13 +126,13 @@
     );
 
     $effect(() => {
-        applyFilter?.(search.ids);
+        applyFilter?.(matches);
 
         const selected = selectedRegionId
             ? getRegionNodeId(selectedRegionId)
             : (panel.selected?.neuron.id ?? null);
 
-        const searchOwnsFocus = networkQuery.length > 0 && !search.error;
+        const searchOwnsFocus = networkQuery.length > 0 && !search.error && !panel.selected;
 
         applyFocus?.(
             searchOwnsFocus ? hoveredNode : (hoveredNode ?? selected),
@@ -271,6 +278,20 @@
         {focusedRegion}
         {connectionCount}
         {selectedRegionId}
+    />
+
+    <NetworkSearchResults
+        {theme}
+        selectedId={panel.selected?.neuron.id}
+        data={network}
+        {matches}
+        bind:filters
+        query={networkQuery}
+        searching={search.searching}
+        onSelect={(id) => {
+            focusNetworkNode(renderer, id);
+            void panel.open(id);
+        }}
     />
 
     <NetworkControls

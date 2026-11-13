@@ -40,3 +40,22 @@ export function fitNetworkInView(renderer: Sigma | null) {
 
     void renderer.getCamera().animate({ ...cameraState, ratio }, { duration: 250 });
 }
+
+export function focusNetworkNode(renderer: Sigma | null, id: string) {
+    if (!renderer?.getGraph().hasNode(id)) {
+        return;
+    }
+
+    const graph = renderer.getGraph();
+    const center = renderer.graphToFramedGraph({
+        x: graph.getNodeAttribute(id, 'x'),
+        y: graph.getNodeAttribute(id, 'y'),
+    });
+    const camera = renderer.getCamera();
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    void camera.animate(
+        { ...center, ratio: Math.min(camera.getState().ratio, 0.7) },
+        { duration: reducedMotion ? 0 : 250 },
+    );
+}
