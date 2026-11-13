@@ -30,6 +30,7 @@
     const NAV_ITEMS = [
         { href: '/neurons', label: 'Neurons' },
         { href: '/network', label: 'Network' },
+        { href: '/proposals', label: 'Proposals' },
     ] as const;
 
     function isActive(href: string): boolean {
@@ -74,6 +75,7 @@
     <TooltipProvider>
         <div class="ml-auto flex min-w-0 items-center gap-2">
             <NeuronSearch />
+
             {#if authEnabled}
                 <form method="post" action={resolve('/logout')}>
                     <Button type="submit" variant="ghost" size="sm">Sign out</Button>
