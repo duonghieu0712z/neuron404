@@ -5,13 +5,16 @@
     import { Tooltip, TooltipContent, TooltipProvider } from '#lib/components/ui/tooltip';
     import { renderMarkdownBlocks } from '#lib/markdown';
     import { createMarkdownInteractions } from '#lib/markdown/interactions.svelte';
+    import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
     let {
         content,
+        sources = [],
         onSelectNeuron,
         fragment = false,
     }: {
         content: string;
+        sources?: { id: string; source: { uri: string } }[];
         fragment?: boolean;
         onSelectNeuron?: (id: string) => void;
     } = $props();
@@ -22,15 +25,32 @@
 
     const uid = $props.id();
     const tooltipId = `${uid}-citation`;
-    const interactions = createMarkdownInteractions(tooltipId, () => onSelectNeuron);
+    const panel = getNeuronPanelContext();
+    const interactions = createMarkdownInteractions(
+        tooltipId,
+        () => onSelectNeuron,
+        panel.openSource,
+        (href) => {
+            const matching = sources.filter((source) => source.source.uri === href);
+
+            return matching.length === 1 ? matching[0].id : null;
+        },
+    );
+
     const citation = $derived(interactions.citation);
+
     $effect(() => {
         void blocks;
+
         return interactions.closeCitation;
     });
 </script>
 
-<div class="markdown-content min-w-0 text-sm leading-relaxed" use:interactions.interceptLinks>
+<div
+    class="markdown-content min-w-0 text-sm leading-relaxed"
+    use:interactions.interceptLinks
+    data-neuron-trigger
+>
     {#each blocks as block, index (index)}
         {#if block.scrollable}
             <ScrollArea orientation="horizontal" class="my-4 w-full min-w-0 rounded-sm">
@@ -68,7 +88,10 @@
         >
             {#if citation}
                 <span class="font-medium">{citation.label}</span>
-                {#if citation.description}<span>{citation.description}</span>{/if}
+
+                {#if citation.description}
+                    <span>{citation.description}</span>
+                {/if}
                 <span class="text-xs break-all opacity-75">{citation.anchor.href}</span>
             {/if}
         </TooltipContent>

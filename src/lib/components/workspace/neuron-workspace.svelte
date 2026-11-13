@@ -4,6 +4,7 @@
     import { resolve } from '$app/paths';
     import { page } from '$app/state';
 
+    import SourceViewer from '#lib/components/source/source-viewer.svelte';
     import * as Resizable from '#lib/components/ui/resizable';
     import { ScrollArea } from '#lib/components/ui/scroll-area';
     import * as Sheet from '#lib/components/ui/sheet';
@@ -13,9 +14,13 @@
     import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
     let { children }: { children: Snippet } = $props();
+
     const panel = getNeuronPanelContext();
     const isMobile = new IsMobile();
-    const panelOpen = $derived(!!panel.selected || !!panel.region);
+
+    const detailsOpen = $derived(!!panel.selected || !!panel.region);
+    const panelOpen = $derived(detailsOpen || !!panel.source);
+
     let workspaceWidth = $state(0);
 
     const sidebarMinSize = $derived(
@@ -56,7 +61,7 @@
 >
     <div class="h-full min-w-0 flex-1" bind:clientWidth={workspaceWidth}>
         <Resizable.PaneGroup direction="horizontal" autoSaveId="neuron404-workspace">
-            <Resizable.Pane id="workspace" order={0} minSize={30}>
+            <Resizable.Pane id="workspace" order={0} minSize={20}>
                 <ScrollArea
                     data-neuron-surface={inNetwork || page.route.id?.startsWith('/neurons')
                         ? ''
@@ -66,7 +71,8 @@
                     {@render children()}
                 </ScrollArea>
             </Resizable.Pane>
-            {#if panelOpen && !isMobile.current}
+
+            {#if detailsOpen && !isMobile.current}
                 <Resizable.Handle
                     withHandle
                     aria-label="Resize details sidebar"
@@ -76,7 +82,7 @@
                     id="details"
                     order={1}
                     defaultSize={40}
-                    minSize={sidebarMinSize}
+                    minSize={panel.source ? 25 : sidebarMinSize}
                     maxSize={70}
                 >
                     <Sidebar collapsible="none" side="right" class="h-full w-full">
@@ -84,8 +90,16 @@
                     </Sidebar>
                 </Resizable.Pane>
             {/if}
+
+            {#if panel.source && !isMobile.current}
+                <Resizable.Handle withHandle aria-label="Resize source sidebar" />
+                <Resizable.Pane id="source" order={2} defaultSize={35} minSize={25} maxSize={70}>
+                    <SourceViewer />
+                </Resizable.Pane>
+            {/if}
         </Resizable.PaneGroup>
     </div>
+
     {#if isMobile.current}
         <Sheet.Root
             open={panelOpen}
@@ -104,7 +118,12 @@
                     <Sheet.Title>Details</Sheet.Title>
                     <Sheet.Description>Selected neuron or region details.</Sheet.Description>
                 </Sheet.Header>
-                <DetailsPanel />
+
+                {#if panel.source}
+                    <SourceViewer />
+                {:else}
+                    <DetailsPanel />
+                {/if}
             </Sheet.Content>
         </Sheet.Root>
     {/if}

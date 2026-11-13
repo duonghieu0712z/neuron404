@@ -1,6 +1,8 @@
 export function createMarkdownInteractions(
     tooltipId: string,
     getOnSelectNeuron: () => ((id: string) => void) | undefined,
+    onSelectSource: (id: string, passage: string) => void,
+    sourceForHref: (href: string) => string | null,
 ) {
     let citation = $state<{
         anchor: HTMLAnchorElement;
@@ -50,6 +52,7 @@ export function createMarkdownInteractions(
                 target instanceof Element
                     ? target.closest<HTMLAnchorElement>('a[data-citation]')
                     : null;
+
             return anchor && node.contains(anchor) ? anchor : null;
         };
 
@@ -92,13 +95,31 @@ export function createMarkdownInteractions(
             closeCitation();
 
             if (
-                !getOnSelectNeuron() ||
                 event.button !== 0 ||
                 event.metaKey ||
                 event.ctrlKey ||
                 event.shiftKey ||
                 event.altKey
             ) {
+                return;
+            }
+
+            const sourceLink =
+                event.target instanceof Element
+                    ? event.target.closest<HTMLAnchorElement>('a[data-citation]')
+                    : null;
+            const snapshotId =
+                sourceLink?.dataset.sourceId ??
+                (sourceLink ? sourceForHref(sourceLink.href) : null);
+
+            if (sourceLink && snapshotId && node.contains(sourceLink)) {
+                event.preventDefault();
+                onSelectSource(snapshotId, sourceLink.closest('p')?.textContent ?? '');
+
+                return;
+            }
+
+            if (!getOnSelectNeuron()) {
                 return;
             }
 

@@ -15,6 +15,7 @@ export function renderMarkdownBlocks(
     if (fragment) {
         const fences = [...content.matchAll(/^ {0,3}(`{3,}|~{3,})([^\n]*)$/gm)];
         const first = fences[0];
+
         // Restore an opening fence when an excerpt starts inside a fenced block.
         if (
             fences.length % 2 === 1 &&
@@ -27,7 +28,7 @@ export function renderMarkdownBlocks(
     }
 
     const tokens = Lexer.lex(content, { gfm: true });
-    const references = new Map<string, { label: string; description: string }>();
+    const references = new Map<string, { label: string; description: string; snapshot?: string }>();
 
     for (const token of tokens) {
         if (token.type !== 'paragraph' || !token.tokens) {
@@ -40,6 +41,7 @@ export function renderMarkdownBlocks(
         if (number && link?.type === 'link') {
             references.set(citationKey(number, link.href), {
                 label: link.text,
+                snapshot: /Snapshot sha256:([a-f0-9]{64})/.exec(link.title ?? '')?.[1],
                 description:
                     token.tokens
                         .slice(2)
@@ -53,9 +55,11 @@ export function renderMarkdownBlocks(
 
     const renderer = new Renderer();
     const renderLink = renderer.link.bind(renderer);
+
     renderer.link = (token: Tokens.Link) => {
         const number = /^\[?(\d+)\]?$/.exec(token.text)?.[1];
         const html = renderLink(token);
+
         return number ? `<sup>${html.replace('<a ', `<a data-citation="${number}" `)}</sup>` : html;
     };
 
@@ -75,6 +79,7 @@ export function renderMarkdownBlocks(
                             'href',
                             'title',
                             'data-neuron-id',
+                            'data-source-id',
                             'target',
                             'rel',
                             'data-citation',
@@ -113,9 +118,14 @@ export function renderMarkdownBlocks(
                                     ? new URL(externalHref).hostname
                                     : `Reference ${number}`);
 
+                            const snapshot =
+                                /Snapshot sha256:([a-f0-9]{64})/.exec(title ?? '')?.[1] ??
+                                reference?.snapshot;
+
                             const citationAttributes: Record<string, string> = number
                                 ? {
                                       'data-citation': number,
+                                      ...(snapshot ? { 'data-source-id': snapshot } : {}),
                                       'data-citation-label': label,
                                       'data-citation-description':
                                           reference?.description || citationDescription(title),
