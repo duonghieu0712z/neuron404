@@ -46,8 +46,16 @@ CLI writes update the index immediately. A persisted checkpoint tracks file stam
 
 The `/network` view renders real neurons and typed Synapses with WebGL. Region boundaries group related members; a draggable hexagonal marker opens each Region's overview. These metadata markers and optional dashed membership lines are excluded from neuron/Synapse counts and do not create stored relationships.
 
-Search, hover and selection emphasize relevant neurons while fading unrelated content. Search takes priority over the sidebar selection until cleared. The sidebar retains selection when switching between Neurons and Network. Motion and display controls are saved in the browser; motion respects reduced-motion preferences.
+Search, hover and selection emphasize relevant neurons while fading unrelated content. Selecting a search result brings its neuron and connected neighborhood into focus while retaining the search results. The sidebar retains selection when switching between Neurons and Network. Motion and display controls are saved in the browser; motion respects reduced-motion preferences.
 
 ## Maintenance integrations
 
 The optional maintenance worker schedules evidence audits and Region overview generation. Agent adapters prepare executable arguments, input and output parsing; the shared runner controls timeouts, cancellation, output limits and schema validation. Adapters implement `MaintenanceAgentAdapter` in `src/lib/server/maintenance/agents/types.ts` and register in `agents/index.ts`. Registering an adapter does not enable it. See [maintenance](maintenance.md) for configuration and report handling.
+
+## Evidence and reviewed updates
+
+Saved source snapshots can be read in a resizable pane beside a neuron. Numbered citations with snapshot metadata open that exact snapshot; a citation with one unambiguous matching structured source URI can also open it. Modified clicks and original-source links retain normal new-tab behavior. The source view distinguishes the cited passage in the neuron from an optional exact excerpt suggested by word overlap, and exposes the complete stored raw text. Matching words do not establish that the source supports the claim.
+
+Region reading paths live in `content/reading-paths/<region>.json`, with prior bytes under `content/history/reading-paths/`. They are authored navigation, separate from Region membership and semantic Synapses. Proposals live in `content/proposals/<uuid>.json`, retaining their base snapshot, patch, reason, client label and final selection. Neither is included in the existing sync manifest.
+
+The Network checks its authenticated snapshot endpoint every two seconds while visible, returns no model payload for unchanged ETags, and backs off after errors. Updates retain existing positions, camera state and normalization bounds. A request does not replace the graph during pointer interaction. New neurons are placed near existing neighbors or their Region. Search results preserve full-text relevance order, support Region, grounding and endorsement filters, and center the camera on the chosen neuron while emphasizing its neighborhood.

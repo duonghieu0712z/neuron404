@@ -47,3 +47,31 @@ CLI writes synchronize the index immediately. External file edits are discovered
 Writes use a storage lock, immutable revision snapshots, and atomic file replacement. Index synchronization updates changed rows in a transaction and preserves existing synapse IDs when their source, target and kind remain unchanged. If a file was saved but subsequent processing failed, read the neuron identified by the error before retrying, then run `neuron404 index`. A leftover `content/.write-lock` after a crash must be checked against its recorded PID before removal; never remove a live writer's lock.
 
 The [neuron404 skill](../skills/neuron404/SKILL.md) provides retrieval, ingestion and review workflows through this CLI. Use `/neuron404` in Claude or `$neuron404` in Codex. Calling it alone reviews the current conversation and proposes knowledge without saving; a natural-language request selects the relevant operation. Installation and client discovery are covered in the [installation guide](installation.md).
+
+## Propose changes for review
+
+When a change should be reviewed before it affects the current neuron, use `proposal:add ID` instead of `update ID`. The JSON payload contains `expectedRevision`, `author`, `reason`, and `changes`. Supported changes are `title`, `body`, `sources`, and `synapses`; omitted fields are preserved, and arrays replace their corresponding proposed arrays. Add evidence with `source:add` first and include its snapshot ID in the proposed sources.
+
+```json
+{
+    "expectedRevision": "<current-neuron-revision>",
+    "author": "Claude",
+    "reason": "Clarify the example and attach its evidence.",
+    "changes": {
+        "body": "<complete proposed Markdown body>",
+        "sources": ["<existing-and-new-source-snapshot-ids>"]
+    }
+}
+```
+
+`proposal:list` and `proposal:read ID` return proposals and their comparison details. The web's **Proposals** view lets a reviewer accept or reject individual content edits, title changes, sources, and groups of synapses sharing a target and relation. Saving resolves the proposal: accepted changes are applied together, and rejected changes remain in its audit record. No proposal changes current knowledge merely by being created. A newer neuron revision blocks application; regenerate the proposal from that revision. Rejection remains available for stale proposals. Existing explicitly authorized `update` operations continue to work directly.
+
+Proposal writes validate the final selection, including source dependencies, preserve neuron history, and leave a prepared receipt for recovery if processing stops after the neuron write. The supplied `author` is a client label, not a verified identity. Remote `proposal:add` requires write permission; resolution is a web session operation.
+
+## Curate a region reading path
+
+Open a Region from Neurons or its network overview, then edit **Reading path**. Save an introduction, an ordered selection of active member neurons, and optional guidance for each step. Reading a step opens its neuron alongside the path, with Previous and Next navigation. Removing a neuron does not silently rewrite the authored path; unavailable steps are omitted from navigation with a notice.
+
+CLI clients use `region:path:read ID` and `region:path:write ID`. A write payload is `{ "expectedRevision": null, "introduction": "...", "steps": [{ "id": "...", "purpose": "..." }] }`; replace `null` with the last returned path revision after the first write. Writes reject duplicate or inactive/nonmember steps and retain the previous path bytes in history.
+
+Proposals and reading paths belong to the selected data root. They are not part of the current neuron/source sync manifest; direct remote commands operate on that remote store. Back up the complete data root to preserve them.
