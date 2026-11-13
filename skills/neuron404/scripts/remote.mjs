@@ -12,10 +12,15 @@ const writes = new Set([
     'region:update',
     'region:write',
     'source:add',
+    'proposal:add',
+    'region:path:write',
     'sync:write',
 ]);
 const reads = new Set([
     'read',
+    'proposal:read',
+    'proposal:list',
+    'region:path:read',
     'neighbors',
     'history',
     'catalog',
@@ -34,9 +39,11 @@ async function readPayload() {
 
     for await (const chunk of process.stdin) {
         size += chunk.length;
+
         if (size > MAX_BODY_BYTES) {
             throw new Error('Payload exceeds 1 MiB.');
         }
+
         chunks.push(chunk);
     }
 
@@ -51,6 +58,7 @@ async function execute(command, args, requestId) {
     }
 
     const payload = writes.has(command) ? await readPayload() : undefined;
+
     return requestRemote(command, args, payload, requestId);
 }
 
@@ -63,6 +71,7 @@ try {
     console.log(JSON.stringify(await execute(command, args, requestId), null, 2));
 } catch (cause) {
     const failure = { error: cause instanceof Error ? cause.message : String(cause) };
+
     if (requestId) {
         failure.requestId = requestId;
         failure.recovery =
