@@ -23,6 +23,43 @@ The image contains the web build, compiled initialization and CLI tools in `dist
 
 To change the host port, run `NEURON404_PORT=8765 docker compose up -d`. On Linux, if your user is not UID/GID 1000, pass `NEURON404_UID=$(id -u) NEURON404_GID=$(id -g)` before Compose commands that start containers so the process can write to your directory. Keep these overrides consistent when recreating containers.
 
+### Secrets from files
+
+The server and CLI accept `_FILE` alternatives for environment variables ending in
+`_TOKEN`, `_API_KEY`, `_SECRET`, or `_PASSWORD`, plus `CF_ACCESS_CLIENT_ID_FILE`.
+For example, use `NEURON404_AUTH_TOKEN_FILE`, `NEURON404_READ_TOKEN_FILE`,
+`NEURON404_TOKEN_FILE`, `OPENAI_API_KEY_FILE`, or `ANTHROPIC_API_KEY_FILE`. The path
+must point to a UTF-8 file readable by the process inside the container. Final
+CR/LF characters are removed. An unreadable or empty file stops startup; setting
+both a nonempty direct value and its `_FILE` alternative is an error. Resolved
+file settings are removed from child environments, which inherit the secret value.
+Do not use `VITE_` variables for secrets: those are intended for browser code.
+
+The default Compose file forwards the owner/read token file paths. Mount each
+secret separately; setting a path alone does not mount the host file. For example,
+create `compose.secrets.yaml` with:
+
+```yaml
+services:
+    neuron404:
+        environment:
+            NEURON404_AUTH_TOKEN: ''
+            NEURON404_AUTH_TOKEN_FILE: /run/secrets/neuron404_auth_token
+        secrets:
+            - neuron404_auth_token
+
+secrets:
+    neuron404_auth_token:
+        file: ./secrets/neuron404_auth_token
+```
+
+Store only the token in that file, keep it outside version control, and grant read
+access only to the container UID/GID and necessary administrators. Then use
+`docker compose -f compose.yaml -f compose.secrets.yaml up -d`. For other supported
+credentials, add their `_FILE` variable and secret mount to the override in the
+same way. This changes how credentials are supplied; the web image still does
+not bundle provider CLIs or start a maintenance worker.
+
 ### Import existing local knowledge
 
 When upgrading from repository-local `content/`, stop other writers and copy that directory into an empty destination before the first Docker startup:

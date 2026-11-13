@@ -16,6 +16,7 @@
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
             return;
         }
+
         event.preventDefault();
         void panel.open(id);
     }
@@ -41,7 +42,18 @@
         {#each data.groups as group (group.id)}
             <section class="space-y-4" aria-labelledby={`region-${group.id}`}>
                 <div class="flex items-baseline gap-2">
-                    <h2 id={`region-${group.id}`} class="text-sm font-semibold">{group.title}</h2>
+                    <h2 id={`region-${group.id}`} class="text-sm font-semibold">
+                        {#if group.id === 'region:unfiled'}{group.title}
+                        {:else}
+                            <a
+                                href={resolve('/regions/[id]', { id: group.id })}
+                                data-neuron-trigger
+                                class="hover:underline"
+                            >
+                                {group.title}
+                            </a>
+                        {/if}
+                    </h2>
                     <span
                         class="text-xs text-muted-foreground tabular-nums"
                         aria-label={`${group.neurons.length} neurons`}

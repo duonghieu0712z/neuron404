@@ -4,7 +4,7 @@
     import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
     import { resolve } from '$app/paths';
 
-    import MarkdownContent from '#lib/components/markdown-content.svelte';
+    import MarkdownContent from '#lib/components/markdown/markdown-content.svelte';
     import { Button } from '#lib/components/ui/button';
     import {
         Collapsible,
@@ -22,6 +22,7 @@
         details: ReviewView['evidenceDetails'];
         onSelectNeuron?: (id: string) => void;
     } = $props();
+
     const sourceLabels = {
         overview: 'Region overview',
         source: 'Captured source',

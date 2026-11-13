@@ -3,11 +3,14 @@
 
     import { resolve } from '$app/paths';
 
-    import DetailSection from '#lib/components/detail-section.svelte';
-    import KnowledgeReview from '#lib/components/knowledge-review.svelte';
-    import MarkdownContent from '#lib/components/markdown-content.svelte';
+    import MarkdownContent from '#lib/components/markdown/markdown-content.svelte';
+    import DetailSection from '#lib/components/neuron/detail-section.svelte';
+    import KnowledgeReview from '#lib/components/review/knowledge-review.svelte';
     import { Badge } from '#lib/components/ui/badge';
+    import { Button } from '#lib/components/ui/button';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
+    import { webHref } from '#lib/links';
+    import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
     let {
         data,
@@ -19,10 +22,17 @@
         onSelectNeuron?: (id: string) => void;
     } = $props();
 
+    const panel = getNeuronPanelContext();
+
+    const trailIndex = $derived(
+        panel.readingTrail?.steps.findIndex((step) => step.id === data.neuron.id) ?? -1,
+    );
+
     function handleSynapseClick(event: MouseEvent, id: string) {
         if (!onSelectNeuron) {
             return;
         }
+
         event.preventDefault();
         onSelectNeuron(id);
     }
@@ -32,6 +42,7 @@
     <DetailSection title="Metadata" size={layout === 'panel' ? 'sm' : 'default'}>
         <div class="flex flex-wrap gap-1.5 pt-1">
             <Badge variant="outline">{data.neuron.status}</Badge>
+
             {#if data.neuron.lifecycle !== 'active'}
                 <Badge variant="outline">{data.neuron.lifecycle}</Badge>
             {/if}
@@ -39,6 +50,7 @@
             <Badge variant="outline">endorsement: {data.neuron.endorsement}</Badge>
             <Badge variant="outline">provenance: {data.neuron.provenance}</Badge>
         </div>
+
         {#if data.regions.length > 0}
             <div class="flex flex-wrap gap-1.5 pt-2" aria-label="Regions">
                 {#each data.regions as region (region.id)}
@@ -50,15 +62,52 @@
 {/snippet}
 
 {#snippet body()}
+    {#if panel.readingTrail && trailIndex >= 0}
+        <nav
+            class="space-y-2 rounded-sm border p-3 text-sm"
+            aria-label="Reading path navigation"
+            data-neuron-trigger
+        >
+            <p>
+                {panel.readingTrail.title} · Step {trailIndex + 1} of {panel.readingTrail.steps
+                    .length}
+            </p>
+
+            {#if panel.readingTrail.steps[trailIndex].purpose}
+                <p class="text-muted-foreground">
+                    {panel.readingTrail.steps[trailIndex].purpose}
+                </p>
+            {/if}
+            <div class="flex gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={trailIndex === 0}
+                    onclick={() => panel.startReading(panel.readingTrail!, trailIndex - 1)}
+                >
+                    Previous
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={trailIndex === panel.readingTrail.steps.length - 1}
+                    onclick={() => panel.startReading(panel.readingTrail!, trailIndex + 1)}
+                >
+                    Next
+                </Button>
+            </div>
+        </nav>
+    {/if}
     <Card size={layout === 'panel' ? 'sm' : 'default'}>
         <CardContent>
-            <MarkdownContent content={data.neuron.body} {onSelectNeuron} />
+            <MarkdownContent content={data.neuron.body} sources={data.sources} {onSelectNeuron} />
         </CardContent>
     </Card>
 {/snippet}
 
 {#snippet synapses()}
     <KnowledgeReview reports={data.reviews} {onSelectNeuron} />
+
     {#if data.neuron.supersededBy}
         <Card size={layout === 'panel' ? 'sm' : 'default'}>
             <CardHeader><CardTitle class="text-sm">Superseded</CardTitle></CardHeader>
@@ -73,6 +122,7 @@
             </CardContent>
         </Card>
     {/if}
+
     {#if data.sources.length > 0}
         <DetailSection
             title="Sources"
@@ -82,19 +132,45 @@
         >
             <ul class="space-y-3 text-sm">
                 {#each data.sources as entry (entry.id)}
+                    {@const href = webHref(entry.source.uri)}
                     <li>
-                        <p class="font-medium">{entry.source.title}</p>
-                        <p class="text-xs break-all text-muted-foreground">
-                            {entry.source.uri}
-                        </p>
-                        {#if entry.source.locator}<p class="text-xs text-muted-foreground">
+                        <Button
+                            variant="link"
+                            class="h-auto p-0 text-left whitespace-normal"
+                            data-neuron-trigger
+                            onclick={() => panel.openSource(entry.id)}
+                        >
+                            {entry.source.title}
+                        </Button>
+
+                        {#if href}
+                            <!-- eslint-disable svelte/no-navigation-without-resolve -- webHref only permits absolute HTTP(S) URLs. -->
+                            <a
+                                {href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-xs break-all text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                            >
+                                {entry.source.uri}
+                            </a>
+                            <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                        {:else}
+                            <p class="text-xs break-all text-muted-foreground">
+                                {entry.source.uri}
+                            </p>
+                        {/if}
+
+                        {#if entry.source.locator}
+                            <p class="text-xs text-muted-foreground">
                                 {entry.source.locator}
-                            </p>{/if}
+                            </p>
+                        {/if}
                     </li>
                 {/each}
             </ul>
         </DetailSection>
     {/if}
+
     {#if data.outgoing.length > 0}
         <DetailSection
             title="Outgoing synapses"

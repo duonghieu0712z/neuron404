@@ -1,17 +1,21 @@
 <script lang="ts">
     import type { RegionOverview } from '#lib/server/neuron/region-overview';
 
-    import DetailSection from '#lib/components/detail-section.svelte';
-    import KnowledgeReview from '#lib/components/knowledge-review.svelte';
-    import MarkdownContent from '#lib/components/markdown-content.svelte';
+    import { resolve } from '$app/paths';
+
+    import MarkdownContent from '#lib/components/markdown/markdown-content.svelte';
+    import DetailSection from '#lib/components/neuron/detail-section.svelte';
+    import KnowledgeReview from '#lib/components/review/knowledge-review.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
 
     let {
         data,
         onSelectNeuron,
+        showReadingLink = true,
     }: {
         data: RegionOverview;
+        showReadingLink?: boolean;
         onSelectNeuron: (id: string) => void;
     } = $props();
 </script>
@@ -21,15 +25,30 @@
         <div class="flex flex-wrap gap-2">
             <Badge variant="outline">Region overview</Badge>
             <Badge variant="secondary">{data.neurons.length} neurons</Badge>
-            {#if data.stale}<Badge variant="outline">Knowledge has changed</Badge>{/if}
+
+            {#if data.stale}
+                <Badge variant="outline">Knowledge has changed</Badge>
+            {/if}
         </div>
         <h1 class="text-xl font-semibold">{data.region.title}</h1>
+
+        {#if showReadingLink}
+            <Button
+                variant="link"
+                class="h-auto p-0"
+                href={resolve('/regions/[id]', { id: data.region.id })}
+            >
+                Open region and reading path
+            </Button>
+        {/if}
+
         {#if data.stale}
             <p class="text-xs leading-relaxed text-muted-foreground">
                 Some supporting knowledge has changed since this overview was written.
             </p>
         {/if}
     </header>
+
     {#if data.body}
         <MarkdownContent content={data.body} {onSelectNeuron} />
     {:else}

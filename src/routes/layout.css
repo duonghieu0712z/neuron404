@@ -147,6 +147,12 @@
     .markdown-content a {
         @apply font-medium underline-offset-4 hover:underline;
     }
+    .markdown-content sup:has(> a[data-citation]) {
+        @apply relative -top-0.5 align-super text-[0.75em] leading-none;
+    }
+    .markdown-content a[data-citation] {
+        @apply rounded-sm text-primary no-underline hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+    }
     .markdown-content :is(ul, ol) {
         @apply my-3 space-y-1 pl-6;
     }

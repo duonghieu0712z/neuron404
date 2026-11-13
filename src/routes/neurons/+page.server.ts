@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 
-import { desc, inArray } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 
 import { db } from '#lib/server/db';
 import { neurons } from '#lib/server/db/schema';
@@ -16,7 +16,11 @@ export const load: PageServerLoad = async ({ url }) => {
     const order = new Map(matches.map((match, index) => [match.id, index]));
     let rows: (typeof neurons.$inferSelect)[] = [];
     if (!query) {
-        rows = await db.select().from(neurons).orderBy(desc(neurons.updatedAt));
+        rows = await db
+            .select()
+            .from(neurons)
+            .where(eq(neurons.lifecycle, 'active'))
+            .orderBy(desc(neurons.updatedAt));
     } else if (matches.length) {
         rows = (
             await db
