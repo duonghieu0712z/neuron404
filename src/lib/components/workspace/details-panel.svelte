@@ -89,7 +89,9 @@
                             {#snippet child({ props })}
                                 <Button
                                     {...props}
-                                    href={inNetwork ? resolve('/neurons') : resolve('/network')}
+                                    href={inNetwork
+                                        ? resolve('/neurons')
+                                        : `${resolve('/network')}?neuron=${encodeURIComponent(panel.selected?.neuron.id ?? '')}`}
                                     variant="ghost"
                                     size="icon-sm"
                                     aria-label={inNetwork ? 'View in Neurons' : 'View in Network'}

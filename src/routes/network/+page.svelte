@@ -4,6 +4,7 @@
     import type Sigma from 'sigma';
     import type { CameraState } from 'sigma/types';
 
+    import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
     import { page } from '$app/state';
     import { mode } from 'mode-watcher';
@@ -15,6 +16,7 @@
     import { filterNetworkNodes, type NetworkFilters } from '#lib/network/filters';
     import { createNetworkFocus } from '#lib/network/focus.svelte';
     import { createNetworkLiveUpdates } from '#lib/network/live-updates';
+    import { createNetworkLocation } from '#lib/network/location.svelte';
     import { type MembershipMode } from '#lib/network/membership';
     import { createNetworkPreferences } from '#lib/network/preferences.svelte';
     import { getRegionNodeId } from '#lib/network/region-node';
@@ -76,6 +78,19 @@
         openRegion: panel.openRegion,
         close: panel.close,
     });
+    const location = createNetworkLocation({
+        url: () => new URL(currentUrl.href),
+        selection: () => focus.selection,
+        ready: () => preferences.ready,
+        pending: () => focus.pending,
+        restore: focus.restoreSelection,
+        navigate: (url) => {
+            // Selection URLs retain the current app location and its configured base path.
+            // eslint-disable-next-line svelte/no-navigation-without-resolve
+            return goto(url, { shallow: true, replace: true, reset: false, state: page.state });
+        },
+    });
+
     $effect(() => {
         panel.setNetworkFocus(focus);
         return () => panel.setNetworkFocus(null);
@@ -266,12 +281,12 @@
         ></div>
     {/if}
 
-    {#if updatesFailed || focus.error}
+    {#if updatesFailed || focus.error || location.error}
         <p
             class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-sm bg-card/95 px-3 py-2 text-xs text-muted-foreground"
             role="status"
         >
-            {focus.error ?? 'Live updates unavailable. Retrying…'}
+            {focus.error ?? location.error ?? 'Live updates unavailable. Retrying…'}
         </p>
     {/if}
 

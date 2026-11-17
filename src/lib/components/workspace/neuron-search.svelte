@@ -20,7 +20,12 @@
                 return;
             }
 
-            const params = new SvelteURLSearchParams();
+            const params = new SvelteURLSearchParams(
+                pathname === resolve('/network')
+                    ? (page.shallow?.url ?? page.url).searchParams.toString()
+                    : undefined,
+            );
+            params.delete('q');
 
             if (searchValue.trim()) {
                 params.set('q', searchValue.trim());
