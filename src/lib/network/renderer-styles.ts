@@ -52,9 +52,11 @@ export function createSigmaRenderer(
             stage: {
                 cursor: { whenState: 'isDragging', then: 'grabbing', else: 'default' },
             },
-            edges: { ...DEFAULT_STYLES.edges, opacity: 1 },
+            edges: { ...DEFAULT_STYLES.edges, opacity: 1, depth: 'edges' },
             nodes: {
                 ...DEFAULT_STYLES.nodes,
+                depth: 'nodes',
+                backdropVisibility: 'hidden',
                 shape: { attribute: 'shape' },
                 labelColor: foreground,
                 labelSize: 12,
@@ -166,6 +168,7 @@ export function createSigmaRenderer(
                         highlighted ? 1 : 0.12,
                     ),
                     size: highlighted ? 3 : 1,
+                    depth: highlighted ? 'topEdges' : 'edges',
                 };
             }
 

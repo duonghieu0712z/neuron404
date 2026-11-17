@@ -3,6 +3,7 @@ import type { NetworkData, NetworkPositions, NetworkTheme } from './types';
 
 import { REGION_COLOR, SYNAPSE_COLORS } from './appearance';
 import { createNetworkGraph } from './graph';
+import { createHoverIntent } from './hover-intent';
 import { createLabelLayer } from './label-layer';
 import { getVisibleMembershipLinks, type MembershipMode } from './membership';
 import { createRegionLayer } from './region-layer';
@@ -34,9 +35,15 @@ export function createNetworkRenderer(options: RendererOptions) {
     const sigmaInstance = createSigmaRenderer(network, options.container, state, theme === 'dark');
 
     const disposeLabels = createLabelLayer(sigmaInstance, state);
-    const disposeRegions = createRegionLayer(sigmaInstance, data, state, theme, (link) =>
-        setMembershipFocus(link),
-    );
+    const disposeRegions = createRegionLayer(sigmaInstance, data, state, theme, (link) => {
+        if (link) {
+            if (!hover.isOver('node') && !hover.isOver('edge')) {
+                hover.enter({ kind: 'membership', link });
+            }
+        } else if (hover.isOver('membership')) {
+            hover.clear();
+        }
+    });
     const synapseSignals = createSynapseSignals(sigmaInstance, () => state.signalLabelMasks);
 
     const synapseEdgeIds = network.edges();
@@ -182,6 +189,9 @@ export function createNetworkRenderer(options: RendererOptions) {
     };
 
     const setEdgeFocus = (edge: string | null) => {
+        if (state.activeEdge === edge) {
+            return;
+        }
         state.activeEdge = edge;
 
         if (edge) {
@@ -193,13 +203,19 @@ export function createNetworkRenderer(options: RendererOptions) {
         sigmaInstance.refresh();
     };
 
-    sigmaInstance.on('enterEdge', ({ edge }) => setEdgeFocus(edge));
-    sigmaInstance.on('leaveEdge', () => setEdgeFocus(null));
-    sigmaInstance.on('enterNode', ({ node }) => {
-        setMembershipFocus(null);
-        options.onHover(node);
+    const hover = createHoverIntent((target) => {
+        setEdgeFocus(target?.kind === 'edge' ? target.id : null);
+        setMembershipFocus(target?.kind === 'membership' ? target.link : null);
+        options.onHover(target?.kind === 'node' ? target.id : null);
     });
-    sigmaInstance.on('leaveNode', () => options.onHover(null));
+    const clearHover = () => hover.clear();
+
+    sigmaInstance.on('enterEdge', ({ edge }) => hover.enter({ kind: 'edge', id: edge }));
+    sigmaInstance.on('leaveEdge', ({ edge }) => hover.leave({ kind: 'edge', id: edge }));
+    sigmaInstance.on('enterNode', ({ node }) => hover.enter({ kind: 'node', id: node }));
+    sigmaInstance.on('leaveNode', ({ node }) => hover.leave({ kind: 'node', id: node }));
+    options.container.addEventListener('pointerleave', clearHover);
+    options.container.addEventListener('pointerdown', clearHover);
 
     const motion = createRendererMotion(sigmaInstance, graph, positions, synapseSignals);
 
@@ -240,6 +256,9 @@ export function createNetworkRenderer(options: RendererOptions) {
         setFocus,
         setMotion: motion.setMotion,
         dispose() {
+            hover.dispose();
+            options.container.removeEventListener('pointerleave', clearHover);
+            options.container.removeEventListener('pointerdown', clearHover);
             synapseSignals.dispose();
             disposeLabels();
             disposeRegions();
