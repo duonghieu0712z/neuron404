@@ -1,26 +1,15 @@
 import type Sigma from 'sigma';
 
+import { getVisibleSignalIntervals, type SignalMask } from './signal-clipping';
 import { getSynapsePulse, phaseOffset, type SignalLink } from './signal-geometry';
+import { createShapeProgram, shapeColor, ShapeMesh } from './webgl-shapes';
 
 export { getSynapsePulse, type SignalLink } from './signal-geometry';
-
-interface SignalMask {
-    left: number;
-    right: number;
-    top: number;
-    bottom: number;
-}
 
 export function createSynapseSignals(
     renderer: Sigma,
     getLabelMasks: () => SignalMask[] = () => [],
 ) {
-    const canvas = renderer.createCanvas('synapse-signals', {
-        afterLayer: 'stage',
-        style: { pointerEvents: 'none', left: '0', top: '0' },
-    });
-    canvas.setAttribute('aria-hidden', 'true');
-    const context = canvas.getContext('2d');
     const graph = renderer.getGraph();
     const startedAt = performance.now();
     let links: (SignalLink & { offset: number })[] = [];
@@ -28,132 +17,99 @@ export function createSynapseSignals(
     let frame: number | null = null;
     let disposed = false;
 
-    const canAnimate = () =>
-        !disposed && !!context && enabled && !document.hidden && links.length > 0;
+    const canAnimate = () => !disposed && enabled && !document.hidden && links.length > 0;
 
-    const clear = () => {
-        if (!context) {
-            return;
+    const buildMesh = () => {
+        const mesh = new ShapeMesh();
+        if (!canAnimate()) {
+            return mesh;
         }
 
-        context.setTransform(1, 0, 0, 1, 0, 0);
-        context.clearRect(0, 0, canvas.width, canvas.height);
-    };
-
-    const draw = (time: number) => {
-        if (!context || !canAnimate()) {
-            clear();
-            return;
-        }
-
-        const { width, height } = renderer.getDimensions();
-        const ratio = window.devicePixelRatio || 1;
-        const bufferWidth = Math.round(width * ratio);
-        const bufferHeight = Math.round(height * ratio);
-
-        if (canvas.width !== bufferWidth) {
-            canvas.width = bufferWidth;
-        }
-
-        if (canvas.height !== bufferHeight) {
-            canvas.height = bufferHeight;
-        }
-
-        if (canvas.style.width !== `${width}px`) {
-            canvas.style.width = `${width}px`;
-        }
-
-        if (canvas.style.height !== `${height}px`) {
-            canvas.style.height = `${height}px`;
-        }
-
-        context.setTransform(ratio, 0, 0, ratio, 0, 0);
-        context.clearRect(0, 0, width, height);
-        context.lineCap = 'round';
+        const nodes = new Map(
+            graph
+                .filterNodes((id) => !renderer.getNodeState(id).isHidden)
+                .map((id) => {
+                    const node = graph.getNodeAttributes(id);
+                    return [
+                        id,
+                        {
+                            ...renderer.graphToViewport({ x: node.x, y: node.y }),
+                            radius: renderer.scaleSize(node.size),
+                        },
+                    ] as const;
+                }),
+        );
+        const nodeMasks = [...nodes.values()];
+        const labelMasks = getLabelMasks();
+        const elapsed = performance.now() - startedAt;
 
         for (const link of links) {
-            if (
-                !graph.hasNode(link.source) ||
-                !graph.hasNode(link.target) ||
-                renderer.getNodeState(link.source).isHidden ||
-                renderer.getNodeState(link.target).isHidden
-            ) {
+            const source = nodes.get(link.source);
+            const target = nodes.get(link.target);
+            if (!source || !target) {
                 continue;
             }
 
-            const source = graph.getNodeAttributes(link.source);
-            const target = graph.getNodeAttributes(link.target);
-
             const pulse = getSynapsePulse(
-                renderer.graphToViewport({ x: source.x, y: source.y }),
-                renderer.graphToViewport({ x: target.x, y: target.y }),
-                renderer.scaleSize(source.size),
-                renderer.scaleSize(target.size),
-                time - startedAt,
+                source,
+                target,
+                source.radius,
+                target.radius,
+                elapsed,
                 link.offset,
             );
-
             if (!pulse || pulse.opacity <= 0) {
                 continue;
             }
 
-            context.globalAlpha = pulse.opacity;
-            const trail = context.createLinearGradient(
-                pulse.tail.x,
-                pulse.tail.y,
-                pulse.head.x,
-                pulse.head.y,
-            );
-            trail.addColorStop(0, `${link.color}00`);
-            trail.addColorStop(0.6, `${link.color}88`);
-            trail.addColorStop(1, link.color);
-            context.strokeStyle = trail;
-            context.lineWidth = 2.4;
-            context.shadowColor = link.color;
-            context.shadowBlur = 4;
-            context.beginPath();
-            context.moveTo(pulse.tail.x, pulse.tail.y);
-            context.lineTo(pulse.head.x, pulse.head.y);
-            context.stroke();
-            context.fillStyle = link.color;
-            context.beginPath();
-            context.arc(pulse.head.x, pulse.head.y, 2, 0, Math.PI * 2);
-            context.fill();
-        }
-
-        context.globalAlpha = 1;
-        context.shadowBlur = 0;
-        context.save();
-        context.globalCompositeOperation = 'destination-out';
-
-        for (const id of graph.nodes()) {
-            if (renderer.getNodeState(id).isHidden) {
-                continue;
+            const point = (t: number) => ({
+                x: pulse.tail.x + (pulse.head.x - pulse.tail.x) * t,
+                y: pulse.tail.y + (pulse.head.y - pulse.tail.y) * t,
+            });
+            for (const [start, end] of getVisibleSignalIntervals(
+                pulse.tail,
+                pulse.head,
+                labelMasks,
+                nodeMasks,
+            )) {
+                mesh.line(
+                    point(start),
+                    point(end),
+                    7,
+                    shapeColor(link.color, start * pulse.opacity * 0.12),
+                    shapeColor(link.color, end * pulse.opacity * 0.12),
+                );
+                mesh.line(
+                    point(start),
+                    point(end),
+                    2.4,
+                    shapeColor(link.color, start * pulse.opacity),
+                    shapeColor(link.color, end * pulse.opacity),
+                );
+                if (end === 1) {
+                    mesh.line(pulse.head, pulse.head, 4, shapeColor(link.color, pulse.opacity));
+                }
             }
-
-            const node = graph.getNodeAttributes(id);
-            const point = renderer.graphToViewport({ x: node.x, y: node.y });
-            context.beginPath();
-            context.arc(point.x, point.y, renderer.scaleSize(node.size) + 2, 0, Math.PI * 2);
-            context.fill();
         }
-
-        for (const mask of getLabelMasks()) {
-            context.clearRect(mask.left, mask.top, mask.right - mask.left, mask.bottom - mask.top);
-        }
-
-        context.restore();
+        return mesh;
     };
 
-    const animate = (time: number) => {
-        frame = null;
+    renderer.addCustomLayerProgram('synapse-signals', 'nodes', (gl) => {
+        const program = createShapeProgram(gl);
+        return {
+            render({ width, height }) {
+                program.draw(buildMesh(), width, height);
+            },
+            kill: program.kill,
+        };
+    });
 
+    const animate = () => {
+        frame = null;
         if (!canAnimate()) {
-            clear();
             return;
         }
-
-        draw(time);
+        renderer.scheduleRender();
         frame = requestAnimationFrame(animate);
     };
 
@@ -166,21 +122,16 @@ export function createSynapseSignals(
             if (frame !== null) {
                 cancelAnimationFrame(frame);
             }
-
             frame = null;
-            clear();
         }
+        renderer.scheduleRender();
     };
 
-    const afterRender = () => draw(performance.now());
-
-    renderer.on('afterRender', afterRender);
     document.addEventListener('visibilitychange', update);
 
     return {
         setLinks(next: SignalLink[]) {
             links = next.map((link) => ({ ...link, offset: phaseOffset(link.id) }));
-            clear();
             update();
         },
         setEnabled(value: boolean) {
@@ -189,8 +140,11 @@ export function createSynapseSignals(
         },
         dispose() {
             disposed = true;
-            update();
-            renderer.off('afterRender', afterRender);
+            if (frame !== null) {
+                cancelAnimationFrame(frame);
+            }
+            frame = null;
+            renderer.removeCustomLayerProgram('synapse-signals');
             document.removeEventListener('visibilitychange', update);
         },
     };

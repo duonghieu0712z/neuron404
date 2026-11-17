@@ -10,7 +10,7 @@ Markdown holds authoritative knowledge; SQLite is a derived search index. The we
 
 Routes load data, handle requests and compose feature components. Product components live in `src/lib/components/` under `network`, `neuron`, `review`, `markdown` and `workspace`; `ui` contains the shadcn-svelte primitives. Workspace components own the header, search, resizable detail layout and scroll controls. Markdown rendering and citation interactions are separate from the content components.
 
-`src/lib/network/` owns graph preparation, renderer state and styles, canvas layers, motion, simulation forces, search and browser preferences. Each renderer instance owns its layers and disposes event listeners, observers and animation frames when the view changes. The Network route connects these services to selection and controls.
+`src/lib/network/` owns graph preparation, renderer state and styles, WebGL layers, motion, simulation forces, search and browser preferences. Each renderer instance owns its layers and disposes event listeners, observers and animation frames when the view changes. The Network route connects these services to selection and controls.
 
 Server modules separate orchestration from storage and validation. Maintenance builds review bundles, prepares evidence references, validates results, stores reports and schedules leased work independently of model execution. Neuron retrieval separates catalogs, context expansion, neighbors and history; index reconciliation delegates transactional persistence. Sync keeps path checks, content validation, scoped reads, manifests and remote transport separate from conflict resolution. Existing command entry points retain their public exports.
 
@@ -44,7 +44,7 @@ CLI writes update the index immediately. A persisted checkpoint tracks file stam
 
 ## Network
 
-The `/network` view renders real neurons and typed Synapses with WebGL. Region boundaries group related members; a draggable hexagonal marker opens each Region's overview. These metadata markers and optional dashed membership lines are excluded from neuron/Synapse counts and do not create stored relationships.
+The `/network` view renders neurons, typed Synapses, Region boundaries, membership lines and animated signals in a single WebGL2 canvas through Sigma custom layer programs. Region geometry renders before edges; signals render before nodes and labels. Detached Canvas 2D contexts only measure text and resolve colors; the color readback context requests `willReadFrequently`. Region boundaries group related members; a draggable hexagonal marker opens each Region's overview. These metadata markers and optional dashed membership lines are excluded from neuron/Synapse counts and do not create stored relationships.
 
 Search, hover and selection emphasize relevant neurons while fading unrelated content. Selecting a neuron on the graph or in search frames its Region when membership is unambiguous; shared neurons retain the current Region or fall back to their direct neighborhood. Region buttons in the neuron sidebar change focus without replacing the open neuron. Camera fitting accounts for the resized sidebar, bounds excessive zoom-out and respects reduced-motion preferences. Background snapshot updates preserve the current camera.
 

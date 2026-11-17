@@ -33,21 +33,9 @@ export function createNetworkRenderer(options: RendererOptions) {
     const { network, simLinks } = graph;
     const sigmaInstance = createSigmaRenderer(network, options.container, state, theme === 'dark');
 
-    const regionCanvas = sigmaInstance.createCanvas('regions', {
-        beforeLayer: 'stage',
-        style: { pointerEvents: 'none', left: '0', top: '0' },
-    });
-
-    regionCanvas.setAttribute('aria-hidden', 'true');
-
-    const disposeLabels = createLabelLayer(sigmaInstance, state, regionCanvas.getContext('2d'));
-    const disposeRegions = createRegionLayer(
-        sigmaInstance,
-        data,
-        state,
-        theme,
-        regionCanvas,
-        (link) => setMembershipFocus(link),
+    const disposeLabels = createLabelLayer(sigmaInstance, state);
+    const disposeRegions = createRegionLayer(sigmaInstance, data, state, theme, (link) =>
+        setMembershipFocus(link),
     );
     const synapseSignals = createSynapseSignals(sigmaInstance, () => state.signalLabelMasks);
 

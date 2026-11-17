@@ -4,19 +4,16 @@ import type Sigma from 'sigma';
 import { LABEL_MAX_WIDTH } from './appearance';
 import { chooseLabelPlacements, labelBox } from './labels';
 
-export function createLabelLayer(
-    sigmaInstance: Sigma,
-    state: RenderState,
-    regionContext: CanvasRenderingContext2D | null,
-) {
+export function createLabelLayer(sigmaInstance: Sigma, state: RenderState) {
     const network = sigmaInstance.getGraph();
+    const measureContext = document.createElement('canvas').getContext('2d');
     const labelWidths: Record<string, number | undefined> = Object.create(null);
 
     const measureLabel = (label: string) => {
         let width = labelWidths[label];
 
         if (width === undefined) {
-            width = regionContext?.measureText(label).width ?? Array.from(label).length * 8;
+            width = measureContext?.measureText(label).width ?? Array.from(label).length * 8;
             labelWidths[label] = width;
         }
 
@@ -28,8 +25,8 @@ export function createLabelLayer(
         const { width, height } = sigmaInstance.getDimensions();
         const cameraState = sigmaInstance.getCamera().getState();
 
-        if (regionContext) {
-            regionContext.font = '12px "Inter Variable", sans-serif';
+        if (measureContext) {
+            measureContext.font = '12px "Inter Variable", sans-serif';
         }
 
         const textChanged: string[] = [];

@@ -8,48 +8,24 @@ import { getVisibleMembershipLinks } from './membership';
 import { createMembershipHover } from './membership-hover';
 import { getRegionNodeId } from './region-node';
 import { getRegionHull } from './regions';
+import { createShapeProgram, shapeColor, ShapeMesh, type Point } from './webgl-shapes';
 
 export function createRegionLayer(
     sigmaInstance: Sigma,
     data: NetworkData,
     state: RenderState,
     theme: NetworkTheme,
-    regionCanvas: HTMLCanvasElement,
     onHover: (link: MembershipLink | null) => void,
 ) {
     const network = sigmaInstance.getGraph();
-    const regionContext = regionCanvas.getContext('2d');
     const isDark = theme === 'dark';
     const foreground = isDark ? '#e5e7eb' : '#272d38';
     const hover = createMembershipHover(sigmaInstance, onHover, () => state.activeEdge !== null);
 
-    const drawRegions = () => {
-        if (!regionContext) {
-            return;
-        }
+    let segments: MembershipSegment[] = [];
 
-        const { width, height } = sigmaInstance.getDimensions();
-        const pixelRatio = window.devicePixelRatio || 1;
-        const bufferWidth = Math.round(width * pixelRatio);
-        const bufferHeight = Math.round(height * pixelRatio);
-
-        if (regionCanvas.width !== bufferWidth) {
-            regionCanvas.width = bufferWidth;
-        }
-
-        if (regionCanvas.height !== bufferHeight) {
-            regionCanvas.height = bufferHeight;
-        }
-
-        regionCanvas.style.width = `${width}px`;
-        regionCanvas.style.height = `${height}px`;
-        regionContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-        regionContext.clearRect(0, 0, width, height);
-        regionContext.font = '500 12px "Inter Variable", sans-serif';
-        regionContext.textBaseline = 'middle';
-
-        regionContext.save();
-        regionContext.setLineDash([14, 8]);
+    const buildMesh = () => {
+        const mesh = new ShapeMesh();
 
         for (const region of data.regions) {
             const members = [...region.nodeIds, getRegionNodeId(region.id)].filter(
@@ -84,40 +60,51 @@ export function createRegionLayer(
 
             const searchOpacity =
                 state.matchesSearch(getRegionNodeId(region.id)) || highlighted ? 1 : 0.25;
-            regionContext.beginPath();
-            const first = hull[0];
+            const outline: Point[] = [];
             const last = hull[hull.length - 1];
-            regionContext.moveTo((first.x + last.x) / 2, (first.y + last.y) / 2);
+            let previous = { x: (hull[0].x + last.x) / 2, y: (hull[0].y + last.y) / 2 };
+            outline.push(previous);
 
             for (let index = 0; index < hull.length; index++) {
-                const point = hull[index];
+                const control = hull[index];
                 const next = hull[(index + 1) % hull.length];
-                regionContext.quadraticCurveTo(
-                    point.x,
-                    point.y,
-                    (point.x + next.x) / 2,
-                    (point.y + next.y) / 2,
+                const end = { x: (control.x + next.x) / 2, y: (control.y + next.y) / 2 };
+                const steps = Math.max(
+                    2,
+                    Math.ceil(
+                        (Math.hypot(control.x - previous.x, control.y - previous.y) +
+                            Math.hypot(end.x - control.x, end.y - control.y)) /
+                            6,
+                    ),
                 );
+
+                for (let step = 1; step <= steps; step++) {
+                    const t = step / steps;
+                    outline.push({
+                        x: (1 - t) ** 2 * previous.x + 2 * (1 - t) * t * control.x + t ** 2 * end.x,
+                        y: (1 - t) ** 2 * previous.y + 2 * (1 - t) * t * control.y + t ** 2 * end.y,
+                    });
+                }
+                previous = end;
             }
 
-            regionContext.closePath();
-            regionContext.fillStyle = isDark ? '#a1a1aa' : '#71717a';
-            regionContext.globalAlpha = (highlighted ? 0.08 : 0.035) * searchOpacity;
-            regionContext.fill();
-            regionContext.strokeStyle = foreground;
-            regionContext.globalAlpha = (highlighted ? 0.45 : 0.18) * searchOpacity;
-            regionContext.lineWidth = highlighted ? 1.5 : 1;
-            regionContext.stroke();
-            regionContext.globalAlpha = 1;
+            mesh.fill(
+                outline,
+                shapeColor(
+                    isDark ? '#a1a1aa' : '#71717a',
+                    (highlighted ? 0.08 : 0.035) * searchOpacity,
+                ),
+            );
+            mesh.dashedPath(
+                outline,
+                highlighted ? 1.5 : 1,
+                shapeColor(foreground, (highlighted ? 0.45 : 0.18) * searchOpacity),
+                14,
+                8,
+            );
         }
 
-        regionContext.restore();
-        regionContext.save();
-        regionContext.setLineDash([4, 5]);
-        regionContext.lineWidth = 1;
-        regionContext.strokeStyle = REGION_COLOR[theme];
-
-        const segments: MembershipSegment[] = [];
+        segments = [];
 
         for (const link of getVisibleMembershipLinks(
             data.regions,
@@ -164,7 +151,6 @@ export function createRegionLayer(
             const focused =
                 state.activeMembership?.source === link.source &&
                 state.activeMembership.target === link.target;
-            regionContext.lineWidth = focused ? 2.5 : 1;
             let opacity = 0.3;
 
             if (state.activeMembership || state.activeEdge) {
@@ -175,26 +161,39 @@ export function createRegionLayer(
                 opacity = 0.16;
             }
 
-            regionContext.globalAlpha =
-                opacity *
-                (link.emphasized ||
+            opacity *=
+                link.emphasized ||
                 (state.matchesSearch(link.source) && state.matchesSearch(link.target))
                     ? 1
-                    : 0.2);
-            regionContext.beginPath();
-            regionContext.moveTo(segment.start.x, segment.start.y);
-            regionContext.lineTo(segment.end.x, segment.end.y);
-            regionContext.stroke();
+                    : 0.2;
+            mesh.dashedPath(
+                [segment.start, segment.end],
+                focused ? 2.5 : 1,
+                shapeColor(REGION_COLOR[theme], opacity),
+                4,
+                5,
+            );
         }
 
-        regionContext.restore();
-        hover.updateSegments(segments);
+        return mesh;
     };
 
-    sigmaInstance.on('afterRender', drawRegions);
-    sigmaInstance.scheduleRender();
+    const updateHover = () => hover.updateSegments(segments);
+    sigmaInstance.on('afterRender', updateHover);
+
+    sigmaInstance.addCustomLayerProgram('regions', 'edges', (gl) => {
+        const program = createShapeProgram(gl);
+        return {
+            render({ width, height }) {
+                program.draw(buildMesh(), width, height);
+            },
+            kill: program.kill,
+        };
+    });
+
     return () => {
         hover.dispose();
-        sigmaInstance.off('afterRender', drawRegions);
+        sigmaInstance.off('afterRender', updateHover);
+        sigmaInstance.removeCustomLayerProgram('regions');
     };
 }
