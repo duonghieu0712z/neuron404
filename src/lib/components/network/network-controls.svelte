@@ -15,6 +15,7 @@
 
     import { Button } from '#lib/components/ui/button';
     import { Card } from '#lib/components/ui/card';
+    import { Toggle } from '#lib/components/ui/toggle';
     import {
         Tooltip,
         TooltipContent,
@@ -91,10 +92,17 @@
 
 <TooltipProvider>
     <Card
-        class="absolute right-4 bottom-4 gap-0 bg-card/95 p-1 shadow-sm backdrop-blur-sm"
+        class="absolute right-4 bottom-4 max-h-[calc(100%-2rem)] gap-0 bg-card/95 p-1 shadow-sm backdrop-blur-sm"
         data-neuron-trigger
     >
-        <NetworkSection title="Controls" iconOnly vertical bind:open={controlsOpen}>
+        <NetworkSection
+            title="Controls"
+            iconOnly
+            vertical
+            bind:open={controlsOpen}
+            class="flex min-h-0 flex-col"
+            contentClass="min-h-0 overflow-y-auto"
+        >
             <div class="flex flex-col items-center gap-1 pt-1">
                 {#each controls as control (control.label)}
                     <Tooltip>
@@ -172,19 +180,16 @@
                 <Tooltip>
                     <TooltipTrigger>
                         {#snippet child({ props })}
-                            <Button
+                            <Toggle
                                 {...props}
-                                variant={showLabels ? 'secondary' : 'ghost'}
-                                size="icon-sm"
+                                bind:pressed={showLabels}
+                                size="sm"
+                                class="size-8 p-0"
                                 aria-label="Show neuron labels"
-                                aria-pressed={showLabels}
                                 disabled={!renderer}
-                                onclick={() => {
-                                    showLabels = !showLabels;
-                                }}
                             >
                                 <TagsIcon class="size-4" />
-                            </Button>
+                            </Toggle>
                         {/snippet}
                     </TooltipTrigger>
                     <TooltipContent side="left">Toggle labels</TooltipContent>
@@ -192,22 +197,21 @@
                 <Tooltip>
                     <TooltipTrigger>
                         {#snippet child({ props })}
-                            <Button
+                            <Toggle
                                 {...props}
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={motionEnabled && !reducedMotion
-                                    ? 'Pause motion'
-                                    : 'Resume motion'}
-                                disabled={!renderer || reducedMotion}
-                                onclick={() => {
-                                    motionEnabled = !motionEnabled;
+                                pressed={motionEnabled && !reducedMotion}
+                                onPressedChange={(pressed) => {
+                                    motionEnabled = pressed;
                                 }}
+                                size="sm"
+                                class="size-8 p-0"
+                                aria-label="Animate network"
+                                disabled={!renderer || reducedMotion}
                             >
                                 {#if motionEnabled && !reducedMotion}<PauseIcon
                                         class="size-4"
                                     />{:else}<PlayIcon class="size-4" />{/if}
-                            </Button>
+                            </Toggle>
                         {/snippet}
                     </TooltipTrigger>
                     <TooltipContent side="left">
