@@ -3,7 +3,7 @@ export function createDimmedNodeColors(colors: Iterable<string>, background: str
     canvas.width = 1;
     canvas.height = 1;
 
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
     if (!context) {
         throw new Error('Canvas 2D context is required to resolve node colors.');
     }
