@@ -14,7 +14,7 @@ export function syncPath(relative: string) {
     const hash = '[a-f0-9]{64}';
 
     const pattern = new RegExp(
-        `^(regions\\.json|operations\\.jsonl|neurons/${id}\\.md|regions/${id}\\.md|sources/${hash}\\.json|history/${id}/${hash}\\.md|history/regions/${hash}\\.json|history/region-overviews/${id}/${hash}\\.md)$`,
+        `^(regions\\.json|operations\\.jsonl|neurons/${id}\\.md|regions/${id}\\.md|sources/${hash}\\.json|maintenance/${hash}\\.json|proposals/[a-f0-9-]{36}\\.json|reading-paths/${id}\\.json|history/reading-paths/${id}/${hash}\\.json|history/${id}/${hash}\\.md|history/regions/${hash}\\.json|history/region-overviews/${id}/${hash}\\.md)$`,
     );
 
     if (!pattern.test(relative)) {
@@ -93,9 +93,14 @@ export async function scopedNeuronIds(regions: string[]) {
 }
 
 export async function readSyncFile(relative: string, regions: string[] = []) {
-    const file = await projectSyncFile(await readRawSyncFile(relative), regions, () =>
-        scopedNeuronIds(regions),
-    );
+    const raw = await readRawSyncFile(relative);
+    if (raw && relative.startsWith('maintenance/')) {
+        const artifact = JSON.parse(raw.content);
+        if (artifact.type === 'source-check' && artifact.payload.status === 'requested') {
+            return null;
+        }
+    }
+    const file = await projectSyncFile(raw, regions, () => scopedNeuronIds(regions));
 
     if (file && relative.startsWith('neurons/')) {
         const references = await readPartialReferences();

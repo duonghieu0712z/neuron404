@@ -3,6 +3,7 @@ import path from 'node:path';
 import matter from '@11ty/gray-matter';
 
 import { neuronFrontmatterSchema } from '#lib/neuron/schema';
+import { markReviewDirtyUnlocked } from '#lib/server/maintenance/dirty';
 
 import { recordPartialReferences } from './partial-references';
 import { atomicWrite, CONTENT_DIR, fingerprint, markIndexDirty, withStorageLock } from './storage';
@@ -42,7 +43,7 @@ export async function writeSyncFile(input: unknown, locked = false) {
             throw new Error(`Sync conflict: ${change.path}`);
         }
 
-        if (existing && /^(history|sources)\//.test(change.path)) {
+        if (existing && /^(history|sources|maintenance)\//.test(change.path)) {
             throw new Error(`Sync conflict: immutable file ${change.path}`);
         }
 
@@ -86,12 +87,24 @@ export async function writeSyncFile(input: unknown, locked = false) {
             );
         }
 
-        await atomicWrite(destination, merged, /^(sources|history)\//.test(change.path));
+        await atomicWrite(
+            destination,
+            merged,
+            /^(sources|history|maintenance)\//.test(change.path),
+        );
 
         if ((await readSyncFile(change.path, regions))?.revision !== next) {
             throw new Error(`Sync conflict: ${change.path}`);
         }
 
+        if (change.path.startsWith('neurons/')) {
+            await markReviewDirtyUnlocked(change.path.slice(8, -3));
+        }
+        if (change.path.startsWith('maintenance/') && JSON.parse(merged).type === 'source-check') {
+            for (const id of Object.keys(JSON.parse(merged).neurons)) {
+                await markReviewDirtyUnlocked(id);
+            }
+        }
         await markIndexDirty();
         return { path: change.path, revision: next };
     };

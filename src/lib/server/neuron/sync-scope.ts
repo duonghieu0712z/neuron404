@@ -65,6 +65,46 @@ export async function selectSyncPaths(names: string[], regions: string[], read: 
             selected.add(name);
         }
     }
+    for (const name of names) {
+        if (name.startsWith('maintenance/') || name.startsWith('proposals/')) {
+            const file = await read(name);
+            if (!file) {
+                continue;
+            }
+            const artifact = JSON.parse(file.content);
+            const ids: string[] = name.startsWith('maintenance/')
+                ? Object.keys(artifact.neurons ?? {})
+                : [
+                      artifact.neuronId,
+                      ...artifact.base.synapses.map((edge: { target: string }) => edge.target),
+                      ...(artifact.patch.synapses ?? []).map(
+                          (edge: { target: string }) => edge.target,
+                      ),
+                  ];
+            if (!ids.length || ids.some((id) => !neuronIds.has(id))) {
+                continue;
+            }
+            if (
+                name.startsWith('maintenance/') &&
+                artifact.regions.some((id: string) => !regions.includes(id))
+            ) {
+                continue;
+            }
+            selected.add(name);
+            const dependencies: string[] = name.startsWith('maintenance/')
+                ? artifact.sources
+                : [...artifact.base.sources, ...(artifact.patch.sources ?? [])];
+            for (const id of dependencies) {
+                sources.add(`sources/${id}.json`);
+            }
+        }
+        if (
+            (name.startsWith('reading-paths/') && regions.includes(name.slice(14, -5))) ||
+            (name.startsWith('history/reading-paths/') && regions.includes(name.split('/')[2]))
+        ) {
+            selected.add(name);
+        }
+    }
     for (const name of ['regions.json', 'operations.jsonl', ...sources]) {
         if (names.includes(name)) {
             selected.add(name);
@@ -82,6 +122,34 @@ export async function projectSyncFile(
         return file;
     }
     let content = file.content;
+    if (file.path.startsWith('maintenance/') || file.path.startsWith('proposals/')) {
+        const value = JSON.parse(content);
+        const ids = await neuronIds();
+        const references: string[] = file.path.startsWith('maintenance/')
+            ? Object.keys(value.neurons ?? {})
+            : [
+                  value.neuronId,
+                  ...value.base.synapses.map((edge: { target: string }) => edge.target),
+                  ...(value.patch.synapses ?? []).map((edge: { target: string }) => edge.target),
+              ];
+        if (
+            !references.length ||
+            references.some((id) => !ids.has(id)) ||
+            (file.path.startsWith('maintenance/') &&
+                value.regions.some((id: string) => !regions.includes(id)))
+        ) {
+            return null;
+        }
+    }
+    if (file.path.startsWith('reading-paths/') && !regions.includes(file.path.slice(14, -5))) {
+        return null;
+    }
+    if (
+        file.path.startsWith('history/reading-paths/') &&
+        !regions.includes(file.path.split('/')[2])
+    ) {
+        return null;
+    }
     if (file.path === 'regions.json') {
         const document = JSON.parse(content);
         const entries = z

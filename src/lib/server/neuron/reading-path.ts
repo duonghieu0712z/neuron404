@@ -9,7 +9,7 @@ import { readRegions } from './regions';
 import { atomicWrite, CONTENT_DIR, fingerprint, withStorageLock } from './storage';
 import { readAllNeurons } from './store';
 
-const pathSchema = z.object({
+export const pathSchema = z.object({
     introduction: z.string().max(20_000),
     steps: z.array(z.object({ id: z.string().min(1), purpose: z.string().max(2000) })).max(500),
 });

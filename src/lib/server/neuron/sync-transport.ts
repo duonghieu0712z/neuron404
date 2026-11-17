@@ -7,7 +7,7 @@ import { normalizeSyncRegions, type SyncFile } from './sync-scope';
 import { syncEntrySchema } from './sync-storage';
 
 const manifestSchema = z.object({
-    protocol: z.literal(2),
+    protocol: z.literal(3),
     regions: z.array(z.string()),
     entries: z.array(syncEntrySchema),
     next: z.number().int().nonnegative().nullable(),

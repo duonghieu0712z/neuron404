@@ -95,7 +95,7 @@ export async function executeNeuronCommand(command: string, args: string[], payl
         const entries = await syncManifest(offset, 1001, regions);
 
         result = {
-            protocol: 2,
+            protocol: 3,
             regions,
             entries: entries.slice(0, 1000),
             next: entries.length > 1000 ? offset + 1000 : null,

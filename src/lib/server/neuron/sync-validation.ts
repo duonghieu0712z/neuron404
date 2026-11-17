@@ -8,8 +8,11 @@ import {
     regionCatalogSchema,
     sourceInputSchema,
 } from '#lib/neuron/schema';
+import { validateArtifact } from '#lib/server/maintenance/artifacts';
+import { proposalSchema } from '#lib/server/proposals/schema';
 
 import { partialReferenceSchema } from './partial-references';
+import { pathSchema } from './reading-path';
 import { fingerprint } from './storage';
 import { syncRegionsSchema } from './sync-scope';
 
@@ -25,6 +28,21 @@ export const writeSchema = z.object({
 });
 
 export function validateContent(relative: string, content: string) {
+    if (relative.startsWith('maintenance/')) {
+        validateArtifact(content, path.basename(relative, '.json'));
+        return;
+    }
+    if (relative.startsWith('proposals/')) {
+        const proposal = proposalSchema.parse(JSON.parse(content));
+        if (relative !== `proposals/${proposal.id}.json`) {
+            throw new Error('Invalid proposal sync ID.');
+        }
+        return;
+    }
+    if (relative.startsWith('reading-paths/')) {
+        pathSchema.parse(JSON.parse(content));
+        return;
+    }
     if (relative.startsWith('history/')) {
         if (path.basename(relative).split('.')[0] !== fingerprint(content)) {
             throw new Error('Invalid history integrity in sync file.');

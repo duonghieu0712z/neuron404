@@ -32,7 +32,11 @@ export async function syncManifest(offset = 0, limit = Infinity, regions: string
             }
 
             if (child.isDirectory()) {
-                if (/^(neurons|regions|sources|history)(\/|$)/.test(name)) {
+                if (
+                    /^(neurons|regions|sources|history|maintenance|proposals|reading-paths)(\/|$)/.test(
+                        name,
+                    )
+                ) {
                     await visit(name);
                 }
             } else {
