@@ -2,6 +2,7 @@ import type { Neuron, Synapse } from '#lib/neuron/schema';
 
 export interface ProposalPatch {
     title?: string;
+    retrievalCues?: string[];
     body?: string;
     sources?: string[];
     synapses?: Synapse[];
@@ -96,7 +97,7 @@ export function deriveProposalChanges(base: Neuron, patch: ProposalPatch) {
         changes.unshift({ id: 'title', field: 'Title', before: base.title, after: patch.title });
     }
 
-    for (const field of ['sources', 'synapses'] as const) {
+    for (const field of ['sources', 'synapses', 'retrievalCues'] as const) {
         if (!patch[field]) {
             continue;
         }
@@ -135,12 +136,14 @@ export function deriveProposalChanges(base: Neuron, patch: ProposalPatch) {
                     return '';
                 }
 
-                return JSON.stringify(field === 'sources' ? value[0] : value, null, 2);
+                return JSON.stringify(field !== 'synapses' ? value[0] : value, null, 2);
             };
 
             changes.push({
                 id: `${field}:${id}`,
-                field: field === 'sources' ? 'Source' : 'Synapse',
+                field: { sources: 'Source', retrievalCues: 'Retrieval cue', synapses: 'Synapse' }[
+                    field
+                ],
                 before: display(oldValue),
                 after: display(newValue),
             });
@@ -164,7 +167,7 @@ export function deriveProposalChanges(base: Neuron, patch: ProposalPatch) {
                     .join(''),
             };
 
-            for (const field of ['sources', 'synapses'] as const) {
+            for (const field of ['sources', 'synapses', 'retrievalCues'] as const) {
                 const selected = changes.filter(
                     (change) => change.id.startsWith(`${field}:`) && accepted.has(change.id),
                 );
@@ -174,7 +177,7 @@ export function deriveProposalChanges(base: Neuron, patch: ProposalPatch) {
                     const previous = change.before ? JSON.parse(change.before) : null;
                     const next = change.after ? JSON.parse(change.after) : null;
 
-                    if (field === 'sources') {
+                    if (field !== 'synapses') {
                         if (previous !== null) {
                             values = values.filter((value) => value !== previous);
                         }
@@ -198,6 +201,8 @@ export function deriveProposalChanges(base: Neuron, patch: ProposalPatch) {
 
                 if (field === 'sources') {
                     result.sources = values as string[];
+                } else if (field === 'retrievalCues') {
+                    result.retrievalCues = values as string[];
                 } else {
                     result.synapses = values as Synapse[];
                 }

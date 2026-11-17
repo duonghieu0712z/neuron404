@@ -10,6 +10,7 @@ export const proposalInputSchema = z
         changes: z
             .object({
                 title: newNeuronInputSchema.shape.title.optional(),
+                retrievalCues: newNeuronInputSchema.shape.retrievalCues.removeDefault().optional(),
                 body: newNeuronInputSchema.shape.body.optional(),
                 sources: newNeuronInputSchema.shape.sources.removeDefault().optional(),
                 synapses: newNeuronInputSchema.shape.synapses.removeDefault().optional(),
