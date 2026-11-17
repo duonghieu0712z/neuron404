@@ -43,6 +43,30 @@
         <p class="text-sm text-muted-foreground">No proposals to review.</p>
     {/if}
 
+    {#if data.decisions.some((item) => showResolved || !item.stale)}
+        <section class="space-y-3">
+            <h2 class="font-medium">Decisions requiring review</h2>
+            {#each data.decisions.filter((item) => showResolved || !item.stale) as item (item.id)}
+                <article class="space-y-2 rounded-sm border p-4 text-sm">
+                    {#if item.neuronId}
+                        <a
+                            class="font-medium underline"
+                            href={resolve('/neurons/[id]', { id: item.neuronId })}
+                        >
+                            {item.title}
+                        </a>
+                    {:else}<p class="font-medium">{item.title}</p>{/if}
+                    <p>{item.reason}</p>
+                    <p class="text-xs text-muted-foreground">
+                        {item.at.slice(0, 10)}{item.stale
+                            ? ' · Neuron changed; reassess this decision'
+                            : ''}
+                    </p>
+                </article>
+            {/each}
+        </section>
+    {/if}
+
     {#each proposals as item (item.proposal.id)}
         <article class="space-y-3 rounded-sm border p-4">
             <div class="flex flex-wrap items-center gap-2">

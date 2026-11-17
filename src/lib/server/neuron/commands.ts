@@ -1,8 +1,12 @@
 import { migrate } from 'drizzle-orm/libsql/migrator';
+import { z } from 'zod';
 
 import { classifiedNeuronInputSchema, updateNeuronInputSchema } from '#lib/neuron/schema';
 import { createDb } from '#lib/server/db/client';
+import { saveArtifact, listArtifacts } from '#lib/server/maintenance/artifacts';
+import { listDisputes, readDispute, writeDispute } from '#lib/server/maintenance/disputes';
 import { listReviewReports, readReport } from '#lib/server/maintenance/reports';
+import { readReviewStatus, requestReview } from '#lib/server/maintenance/status';
 import { createNeuron, updateNeuron } from '#lib/server/neuron/create';
 import { deleteNeuron } from '#lib/server/neuron/delete';
 import { ensureIndex, rebuildIndex, synchronizeIndex } from '#lib/server/neuron/indexer';
@@ -40,6 +44,9 @@ export const REMOTE_READ_COMMANDS = [
     'search',
     'region:read',
     'source:read',
+    'review:status',
+    'dispute:list',
+    'dispute:read',
     'review:reports',
     'review:read',
     'sync:manifest',
@@ -54,6 +61,11 @@ export const REMOTE_WRITE_COMMANDS = [
     'region:update',
     'region:write',
     'source:add',
+    'source:refresh',
+    'review:request',
+    'dispute:open',
+    'dispute:comment',
+    'dispute:resolve',
     'sync:write',
 ] as const;
 
@@ -74,7 +86,52 @@ export async function executeNeuronCommand(command: string, args: string[], payl
 
     let result: unknown;
 
-    if (command === 'proposal:add') {
+    if (command === 'review:status') {
+        result = await readReviewStatus(args[0]);
+    } else if (command === 'review:request') {
+        result = await requestReview(args[0]);
+    } else if (command === 'dispute:list') {
+        result = await listDisputes();
+    } else if (command === 'dispute:read') {
+        result = await readDispute(args[0]);
+    } else if (['dispute:open', 'dispute:comment', 'dispute:resolve'].includes(command)) {
+        result = await writeDispute(
+            command.split(':')[1] as 'open' | 'comment' | 'resolve',
+            args[0],
+            payload,
+        );
+    } else if (command === 'source:refresh') {
+        const source = await readSource(args[0]);
+        if (option('--schedule') === 'monthly' && !option('--reason')?.trim()) {
+            throw new Error('Missing value for monthly schedule reason.');
+        }
+        const previous = (await listArtifacts('source-check'))
+            .filter((item) => item.payload.original === source.id)
+            .at(-1);
+        result = await saveArtifact({
+            version: 1,
+            type: 'source-check',
+            at: new Date(
+                Math.max(Date.now(), previous ? Date.parse(previous.at) + 1 : 0),
+            ).toISOString(),
+            neurons: {},
+            regions: [],
+            sources: [source.id],
+            parents: previous ? [previous.id] : [],
+            payload: {
+                original: source.id,
+                status: 'requested',
+                snapshot: previous?.payload.snapshot,
+                etag: previous?.payload.etag,
+                lastModified: previous?.payload.lastModified,
+                uri: previous?.payload.uri,
+                schedule: option('--schedule')
+                    ? z.enum(['daily', 'weekly', 'monthly']).parse(option('--schedule'))
+                    : previous?.payload.schedule,
+                scheduleReason: option('--reason') ?? previous?.payload.scheduleReason,
+            },
+        });
+    } else if (command === 'proposal:add') {
         result = await createProposal(args[0], payload);
     } else if (command === 'proposal:read') {
         result = await readProposal(args[0]);

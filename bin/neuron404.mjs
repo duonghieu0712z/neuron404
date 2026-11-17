@@ -13,7 +13,9 @@ if (command === '--version' || command === '-v') {
     console.log(`Usage: neuron404 <command> [arguments]
 
 Knowledge: search, catalog, read, neighbors, history, add, update
-Evidence: source:add, source:read
+Evidence: source:add, source:read, source:refresh
+Review: review:status, review:request, review:reports, review:read
+Disputes: dispute:list, dispute:read, dispute:open, dispute:comment, dispute:resolve
 Proposals: proposal:add, proposal:read, proposal:list
 Regions: region:add, region:read, region:write, region:path:read, region:path:write
 Administration: migrate, index, lint, sync, maintenance, serve

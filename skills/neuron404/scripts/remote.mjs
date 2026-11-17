@@ -12,6 +12,11 @@ const writes = new Set([
     'region:update',
     'region:write',
     'source:add',
+    'source:refresh',
+    'review:request',
+    'dispute:open',
+    'dispute:comment',
+    'dispute:resolve',
     'proposal:add',
     'region:path:write',
     'sync:write',
@@ -28,6 +33,9 @@ const reads = new Set([
     'region:read',
     'source:read',
     'review:reports',
+    'review:status',
+    'dispute:list',
+    'dispute:read',
     'review:read',
     'sync:manifest',
     'sync:read',
@@ -57,7 +65,10 @@ async function execute(command, args, requestId) {
         );
     }
 
-    const payload = writes.has(command) ? await readPayload() : undefined;
+    const payload =
+        writes.has(command) && !['review:request', 'source:refresh'].includes(command)
+            ? await readPayload()
+            : undefined;
 
     return requestRemote(command, args, payload, requestId);
 }

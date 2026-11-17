@@ -3,7 +3,11 @@ import { eq } from 'drizzle-orm';
 
 import { db } from '#lib/server/db';
 import { neurons, synapses } from '#lib/server/db/schema';
+import { listArtifacts } from '#lib/server/maintenance/artifacts';
+import { listDisputes } from '#lib/server/maintenance/disputes';
+import { readNeuronReviews } from '#lib/server/maintenance/neuron-reports';
 import { readRegionReviews } from '#lib/server/maintenance/reports';
+import { readReviewStatus } from '#lib/server/maintenance/status';
 
 import { readIndexedNeuron } from './indexed-store';
 import { INDEX_RECHECK_MS, synchronizeIndexUnlocked } from './indexer';
@@ -61,6 +65,24 @@ export async function getNeuronDetail(id: string) {
                 findings: report.findings.filter((finding) => finding.neurons.includes(id)),
             }))
             .filter((report) => report.checks.length || report.findings.length);
-        return { neuron, outgoing, incoming, regions, sources, reviews };
+        reviews.push(...(await readNeuronReviews(id)));
+        return {
+            neuron,
+            outgoing,
+            incoming,
+            regions,
+            sources,
+            reviews,
+            reviewStatus: await readReviewStatus(id),
+            disputes: (await listDisputes()).filter((dispute) =>
+                dispute.events.some((event) => Object.hasOwn(event.neurons, id)),
+            ),
+            sourceChecks: (await listArtifacts('source-check'))
+                .filter((item) => Object.hasOwn(item.neurons, id))
+                .slice(-5),
+            repairs: (await listArtifacts('repair'))
+                .filter((item) => Object.hasOwn(item.neurons, id))
+                .slice(-5),
+        };
     });
 }

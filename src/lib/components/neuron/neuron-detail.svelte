@@ -6,6 +6,7 @@
     import MarkdownContent from '#lib/components/markdown/markdown-content.svelte';
     import DetailSection from '#lib/components/neuron/detail-section.svelte';
     import KnowledgeReview from '#lib/components/review/knowledge-review.svelte';
+    import MaintenanceStatus from '#lib/components/review/maintenance-status.svelte';
     import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
@@ -104,6 +105,7 @@
 {/snippet}
 
 {#snippet synapses()}
+    <MaintenanceStatus {data} />
     <KnowledgeReview reports={data.reviews} {onSelectNeuron} />
 
     {#if data.neuron.supersededBy}

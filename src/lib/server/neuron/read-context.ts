@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 
 import { synapses } from '#lib/server/db/schema';
+import { readNeuronReviews } from '#lib/server/maintenance/neuron-reports';
 import { readRegionReviews } from '#lib/server/maintenance/reports';
 
 import { readIndexedNeuron, withIndexedStore } from './indexed-store';
@@ -133,7 +134,7 @@ export async function readNeuronContext(ids: string[]) {
                     neurons: [...new Set([...(partial[id]?.neurons ?? []), ...missingContext])],
                     regions: partial[id]?.regions ?? [],
                 },
-                reviews: reviews
+                reviews: [...reviews, ...(await readNeuronReviews(id))]
                     .filter(
                         (report) =>
                             report.checks.some((check) => check.subject === id) ||

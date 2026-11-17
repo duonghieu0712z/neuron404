@@ -42,7 +42,18 @@
                 {report.createdAt.slice(0, 10)} · Checked against supplied evidence, not independent confirmation
                 of truth.
             </p>
-            <p class="text-xs leading-relaxed text-muted-foreground">{report.coverage}</p>
+            {#if report.scope}
+                <p class="text-xs leading-relaxed text-muted-foreground">
+                    Scope {report.scope.part + 1}/{report.scope.total}. Only the recorded excerpts
+                    were checked.
+                </p>
+                <details class="text-xs text-muted-foreground">
+                    <summary>Evidence positions and revisions</summary>
+                    <pre class="overflow-auto whitespace-pre-wrap">{report.scope.description}</pre>
+                </details>
+            {:else}
+                <p class="text-xs leading-relaxed text-muted-foreground">{report.coverage}</p>
+            {/if}
 
             {#each report.findings as finding (finding.id)}
                 <section class="space-y-2 border-t pt-3 text-xs leading-relaxed">
