@@ -3,12 +3,15 @@ import './env';
 import { createServer } from 'node:http';
 import process from 'node:process';
 
+import { startMaintenance } from '#lib/server/maintenance/runtime';
 import { apiPermission, authConfiguration } from '#lib/server/remote/auth';
 import { handleCommand } from '#lib/server/remote/commands';
 
 if (!authConfiguration().enabled) {
     throw new Error('The API server requires NEURON404_AUTH_TOKEN.');
 }
+
+startMaintenance();
 
 const server = createServer(async (incoming, outgoing) => {
     const respond = async (response: Response) => {

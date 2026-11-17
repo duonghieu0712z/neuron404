@@ -18,6 +18,15 @@ export default defineConfig(({ mode }) => {
         }
     }
 
+    for (const [name, value] of Object.entries(env)) {
+        if (
+            (name.startsWith('NEURON404_MAINTENANCE_') || name === 'NEURON404_SOURCE_ROOTS') &&
+            !process.env[name]
+        ) {
+            process.env[name] = value;
+        }
+    }
+
     return {
         build: {
             minify: true,

@@ -1,5 +1,13 @@
 import type { Handle } from '@sveltejs/kit/hooks';
 
+import { building } from '$app/env';
+
+import { startMaintenance } from '#lib/server/maintenance/runtime';
+
+if (!building) {
+    startMaintenance();
+}
+
 import process from 'node:process';
 
 import { redirect } from '@sveltejs/kit';
