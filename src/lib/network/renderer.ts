@@ -125,7 +125,11 @@ export function createNetworkRenderer(options: RendererOptions) {
         sigmaInstance.refresh();
     };
 
-    const setFocus = (id: string | null, selected: string | null) => {
+    const setFocus = (
+        id: string | null,
+        selected: string | null,
+        regionId: string | null = null,
+    ) => {
         state.activeNode =
             id && network.hasNode(id) && !sigmaInstance.getNodeState(id).isHidden ? id : null;
         state.selectedNode =
@@ -133,13 +137,25 @@ export function createNetworkRenderer(options: RendererOptions) {
                 ? selected
                 : null;
 
-        const region = state.activeNode ? state.regionByNodeId.get(state.activeNode) : undefined;
+        const region = state.activeNode
+            ? (state.regionByNodeId.get(state.activeNode) ??
+              (state.activeNode === state.selectedNode
+                  ? data.regions.find(
+                        (region) =>
+                            region.id === regionId && region.nodeIds.includes(state.activeNode!),
+                    )
+                  : undefined))
+            : undefined;
 
         state.neighborhood = new Set<string>();
 
         if (state.activeNode) {
             const members = region
-                ? region.nodeIds
+                ? [
+                      ...region.nodeIds,
+                      getRegionNodeId(region.id),
+                      ...network.neighbors(state.activeNode),
+                  ]
                 : [
                       ...network.neighbors(state.activeNode),
                       ...data.regions

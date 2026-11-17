@@ -6,7 +6,6 @@
     import { Card, CardContent } from '#lib/components/ui/card';
     import { ScrollArea } from '#lib/components/ui/scroll-area';
     import { GROUNDING_COLORS, REGION_COLOR, SYNAPSE_COLORS } from '#lib/network/appearance';
-    import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
     import { GROUNDING_LEVELS, SYNAPSE_KINDS } from '#lib/neuron/schema';
 
     import LegendRow from './legend-row.svelte';
@@ -21,6 +20,7 @@
         focusedRegion,
         connectionCount,
         selectedRegionId,
+        onOpenRegion,
     }: {
         data: NetworkData;
         theme: NetworkTheme;
@@ -37,9 +37,8 @@
         focusedRegion: NetworkData['regions'][number] | undefined;
         connectionCount: number;
         selectedRegionId: string | null;
+        onOpenRegion: (id: string) => Promise<boolean>;
     } = $props();
-
-    const panel = getNeuronPanelContext();
 
     function displayLabel(value: string) {
         return value.charAt(0).toUpperCase() + value.slice(1);
@@ -123,7 +122,7 @@
                                     variant={selectedRegionId === region.id ? 'secondary' : 'ghost'}
                                     class="h-auto w-full justify-between gap-3 px-2 py-1.5 text-xs"
                                     aria-pressed={selectedRegionId === region.id}
-                                    onclick={() => void panel.openRegion(region.id)}
+                                    onclick={() => void onOpenRegion(region.id)}
                                 >
                                     <span class="min-w-0 truncate">{region.title}</span>
                                     <span class="tabular-nums">{region.nodeIds.length}</span>

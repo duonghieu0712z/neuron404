@@ -13,7 +13,16 @@ export interface ReadingTrail {
     steps: { id: string; title: string; purpose: string }[];
 }
 
+export interface NetworkPanelFocus {
+    readonly regionId: string | null;
+    readonly pending: boolean;
+    selectRegion(id: string): void;
+}
+
 export interface NeuronPanelContext {
+    readonly networkFocus: NetworkPanelFocus | null;
+    setNetworkFocus(value: NetworkPanelFocus | null): void;
+
     readonly readingTrail: ReadingTrail | null;
     startReading(trail: ReadingTrail, index: number): Promise<void>;
 
@@ -34,6 +43,7 @@ export interface NeuronPanelContext {
 }
 
 export function createNeuronPanelContext(): NeuronPanelContext {
+    let networkFocus = $state.raw<NetworkPanelFocus | null>(null);
     let selected = $state<NeuronDetail | null>(null);
     let region = $state<RegionOverview | null>(null);
     let readingTrail = $state<ReadingTrail | null>(null);
@@ -138,6 +148,12 @@ export function createNeuronPanelContext(): NeuronPanelContext {
     }
 
     const context: NeuronPanelContext = {
+        get networkFocus() {
+            return networkFocus;
+        },
+        setNetworkFocus(value) {
+            networkFocus = value;
+        },
         get readingTrail() {
             return readingTrail;
         },

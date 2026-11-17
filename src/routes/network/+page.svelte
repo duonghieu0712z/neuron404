@@ -12,8 +12,8 @@
     import NetworkControls from '#lib/components/network/network-controls.svelte';
     import NetworkOverview from '#lib/components/network/network-overview.svelte';
     import NetworkSearchResults from '#lib/components/network/network-search-results.svelte';
-    import { focusNetworkNode } from '#lib/network/camera';
     import { filterNetworkNodes, type NetworkFilters } from '#lib/network/filters';
+    import { createNetworkFocus } from '#lib/network/focus.svelte';
     import { createNetworkLiveUpdates } from '#lib/network/live-updates';
     import { type MembershipMode } from '#lib/network/membership';
     import { createNetworkPreferences } from '#lib/network/preferences.svelte';
@@ -34,9 +34,8 @@
     const preferences = createNetworkPreferences();
     const panel = getNeuronPanelContext();
 
-    const networkQuery = $derived(
-        (page.shallow?.url ?? page.url).searchParams.get('q')?.trim() ?? '',
-    );
+    const currentUrl = $derived(page.shallow?.url ?? page.url);
+    const networkQuery = $derived(currentUrl.searchParams.get('q')?.trim() ?? '');
 
     const search = createNetworkSearch(
         () => networkQuery,
@@ -61,8 +60,26 @@
     let reducedMotion = $state(false);
     let applyMotion = $state<((enabled: boolean) => void) | null>(null);
     let applyLabels = $state<((visible: boolean) => void) | null>(null);
-    let applyFocus = $state<((id: string | null, selected: string | null) => void) | null>(null);
+    let applyFocus = $state<
+        ((id: string | null, selected: string | null, regionId: string | null) => void) | null
+    >(null);
     let refreshing = $state(false);
+
+    const focus = createNetworkFocus({
+        data: () => network,
+        renderer: () => renderer,
+        selectedNeuron: () => panel.selected?.neuron.id ?? null,
+        selectedRegion: () => selectedRegionId,
+        preferredRegion: () => filters.region || null,
+        autoFocus: () => true,
+        openNeuron: panel.open,
+        openRegion: panel.openRegion,
+        close: panel.close,
+    });
+    $effect(() => {
+        panel.setNetworkFocus(focus);
+        return () => panel.setNetworkFocus(null);
+    });
 
     const positions: Record<string, { x: number; y: number } | undefined> = {};
 
@@ -137,6 +154,7 @@
         applyFocus?.(
             searchOwnsFocus ? hoveredNode : (hoveredNode ?? selected),
             searchOwnsFocus ? null : selected,
+            focus.regionId,
         );
     });
 
@@ -184,8 +202,8 @@
             onHover: (id) => {
                 hoveredNode = id;
             },
-            onOpenNeuron: panel.open,
-            onOpenRegion: panel.openRegion,
+            onOpenNeuron: focus.openNeuron,
+            onOpenRegion: focus.openRegion,
             onClose: panel.close,
         });
 
@@ -248,12 +266,12 @@
         ></div>
     {/if}
 
-    {#if updatesFailed}
+    {#if updatesFailed || focus.error}
         <p
             class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-sm bg-card/95 px-3 py-2 text-xs text-muted-foreground"
             role="status"
         >
-            Live updates unavailable. Retrying…
+            {focus.error ?? 'Live updates unavailable. Retrying…'}
         </p>
     {/if}
 
@@ -277,7 +295,8 @@
         {focusedNode}
         {focusedRegion}
         {connectionCount}
-        {selectedRegionId}
+        selectedRegionId={selectedRegionId ?? focus.regionId}
+        onOpenRegion={focus.openRegion}
     />
 
     <NetworkSearchResults
@@ -289,8 +308,7 @@
         query={networkQuery}
         searching={search.searching}
         onSelect={(id) => {
-            focusNetworkNode(renderer, id);
-            void panel.open(id);
+            void focus.openNeuron(id);
         }}
     />
 

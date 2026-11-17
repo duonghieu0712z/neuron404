@@ -53,7 +53,22 @@
         {#if data.regions.length > 0}
             <div class="flex flex-wrap gap-1.5 pt-2" aria-label="Regions">
                 {#each data.regions as region (region.id)}
-                    <Badge variant="secondary">{region.title}</Badge>
+                    {#if layout === 'panel' && panel.networkFocus}
+                        <Button
+                            variant={panel.networkFocus.regionId === region.id
+                                ? 'secondary'
+                                : 'outline'}
+                            size="sm"
+                            class="h-auto rounded-sm px-2 py-1 text-xs"
+                            aria-pressed={panel.networkFocus.regionId === region.id}
+                            disabled={panel.networkFocus.pending}
+                            onclick={() => panel.networkFocus?.selectRegion(region.id)}
+                        >
+                            {region.title}
+                        </Button>
+                    {:else}
+                        <Badge variant="secondary">{region.title}</Badge>
+                    {/if}
                 {/each}
             </div>
         {/if}
