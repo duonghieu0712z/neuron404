@@ -12,7 +12,16 @@ export function makeReport(
     body?: string,
 ): Omit<ReviewReport, 'id'> {
     return {
-        version: 1,
+        version: bundle.scope ? 2 : 1,
+        ...(bundle.scope ? { scope: bundle.scope } : {}),
+        ...(bundle.selection
+            ? {
+                  selection: Object.fromEntries(
+                      bundle.context.map(({ neuron }) => [neuron.id, bundle.selection![neuron.id]]),
+                  ),
+              }
+            : {}),
+        ...(bundle.catalog ? { catalog: bundle.catalog } : {}),
         kind,
         region: bundle.region.id,
         createdAt: new Date().toISOString(),
@@ -20,13 +29,15 @@ export function makeReport(
         ...bundleRevisions(bundle),
         unavailableSources: bundle.unavailableSources,
         coverage:
-            kind === 'overview'
+            bundle.scope?.description ??
+            (kind === 'overview'
                 ? 'Overview-to-member fidelity, with one check per paragraph. Original sources and external factual truth were not checked in this report.'
-                : 'All Region members against their supplied source snapshots, direct semantic neighbors and replacements, and up to three external title/alias candidates. Sources were not refreshed; this is not an exhaustive all-pairs audit.',
+                : 'All Region members against their supplied source snapshots, direct semantic neighbors and replacements, and up to three external title/alias candidates. Sources were not refreshed; this is not an exhaustive all-pairs audit.'),
         ...(body === undefined ? {} : { candidateHash: fingerprint(body.trim()) }),
         summary: output.summary,
         verdict: output.verdict,
         checks: output.checks,
+        ...(output.sourcePolicies ? { sourcePolicies: output.sourcePolicies } : {}),
         findings: output.findings.map((finding) => ({
             ...finding,
             id: fingerprint(

@@ -9,6 +9,10 @@ import { atomicWrite, withStorageLock } from '#lib/server/neuron/storage';
 const jobSchema = z.object({
     kind: z.enum(['overview', 'knowledge']).default('overview'),
     region: z.string().optional(),
+    neuron: z.string().optional(),
+    dependencies: z.record(z.string(), z.string()).optional(),
+    part: z.number().optional(),
+    outcome: z.enum(['supported', 'consistent', 'issues', 'unverifiable']).optional(),
     report: z.string().optional(),
     fingerprint: z.string(),
     observedAt: z.number(),
@@ -27,11 +31,15 @@ const stateSchema = z.object({
     windowStartedAt: z.number(),
     requests: z.number(),
     jobs: z.record(z.string(), jobSchema),
+    reviewRequests: z.record(z.string(), z.number()).default({}),
+    dirtyNeurons: z.array(z.string()).default([]),
+    lastWork: z.enum(['review', 'repair']).optional(),
+    scanErrors: z.record(z.string(), z.string()).default({}),
 });
 
 type State = z.infer<typeof stateSchema>;
 
-const statePath = path.join(DATA_DIR, 'maintenance', 'state.json');
+export const statePath = path.join(DATA_DIR, 'maintenance', 'state.json');
 export const hour = 60 * 60 * 1000;
 
 export async function readMaintenanceState(): Promise<State> {
@@ -40,7 +48,7 @@ export async function readMaintenanceState(): Promise<State> {
         state.jobs = Object.fromEntries(
             Object.entries(state.jobs).map(([key, job]) => {
                 const region = job.region ?? key.replace(/^(overview|knowledge):/, '');
-                return [`${job.kind}:${region}`, { ...job, region }];
+                return [job.neuron ? key : `${job.kind}:${region}`, { ...job, region }];
             }),
         );
         return state;
@@ -49,7 +57,15 @@ export async function readMaintenanceState(): Promise<State> {
             throw error;
         }
 
-        return { version: 1, windowStartedAt: Date.now(), requests: 0, jobs: {} };
+        return {
+            version: 1,
+            windowStartedAt: Date.now(),
+            requests: 0,
+            jobs: {},
+            scanErrors: {},
+            dirtyNeurons: [],
+            reviewRequests: {},
+        };
     }
 }
 

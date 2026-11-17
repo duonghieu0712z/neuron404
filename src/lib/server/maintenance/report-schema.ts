@@ -8,7 +8,29 @@ const revisionsSchema = z.record(z.string(), hashSchema);
 
 export const reportSchema = z.object({
     id: hashSchema,
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
+    scopeSetRevision: hashSchema.optional(),
+    selection: z.record(z.string(), z.string()).optional(),
+    catalog: z
+        .array(
+            z.object({
+                id: z.string(),
+                revision: hashSchema,
+                title: z.string(),
+                cues: z.array(z.string()),
+            }),
+        )
+        .optional(),
+    requestGeneration: z.number().int().nonnegative().optional(),
+    reviewedInputCurrent: z.boolean().optional(),
+    scope: z
+        .object({
+            neuron: z.string(),
+            part: z.number().int().nonnegative(),
+            total: z.number().int().positive(),
+            description: z.string(),
+        })
+        .optional(),
     kind: z.enum(['knowledge', 'overview']),
     region: regionIdSchema,
     createdAt: z.string(),
@@ -23,6 +45,7 @@ export const reportSchema = z.object({
     summary: z.string(),
     verdict: reviewOutputSchema.shape.verdict,
     checks: reviewOutputSchema.shape.checks,
+    sourcePolicies: reviewOutputSchema.shape.sourcePolicies,
     findings: z.array(
         reviewFindingSchema.extend({
             id: hashSchema,

@@ -29,6 +29,21 @@ export function validate(
 
         seen.add(check.subject);
 
+        if (check.verdict === 'consistent') {
+            const member = bundle.members.find(({ neuron }) => neuron.id === check.subject);
+            if (
+                candidate !== undefined ||
+                !member ||
+                (member.neuron.grounding === 'sourced' &&
+                    member.neuron.provenance !== 'original') ||
+                !check.evidence.some((item) => item.kind === 'neuron' && item.id === check.subject)
+            ) {
+                throw new Error(
+                    'A consistency check must quote an original decision or explicitly inferred/assumed note, not claim source support.',
+                );
+            }
+        }
+
         if (check.verdict === 'supported' && !check.evidence.length) {
             throw new Error('A supported check requires quoted evidence.');
         }
@@ -69,7 +84,7 @@ export function validate(
     if (candidate === undefined) {
         for (const check of output.checks) {
             if (
-                check.verdict === 'supported' ||
+                ['supported', 'consistent'].includes(check.verdict) ||
                 output.findings.some((finding) => finding.neurons.includes(check.subject))
             ) {
                 continue;
@@ -83,15 +98,16 @@ export function validate(
                 explanation: `Evidence check requires attention: ${check.reason}`,
                 suggestion:
                     'Review the cited claim and capture sufficient evidence or qualify the unsupported statement.',
-                evidence: check.evidence.length
-                    ? check.evidence
-                    : [
-                          {
-                              kind: 'neuron',
-                              id: check.subject,
-                              quote: evidencePassages(member.neuron.body)[0],
-                          },
-                      ],
+                evidence: [
+                    {
+                        kind: 'neuron',
+                        id: check.subject,
+                        quote: evidencePassages(member.neuron.body)[0],
+                    },
+                    ...check.evidence
+                        .filter((item) => item.kind !== 'neuron' || item.id !== check.subject)
+                        .slice(0, 7),
+                ],
                 synapse: null,
             });
         }
@@ -117,6 +133,20 @@ export function validate(
     }
 
     for (const finding of output.findings) {
+        if (candidate === undefined) {
+            const anchors = new Set(
+                finding.evidence.filter((item) => item.kind === 'neuron').map((item) => item.id),
+            );
+            if (
+                !finding.neurons.some((id) => anchors.has(id)) ||
+                ((finding.kind === 'contradiction' || finding.synapse) &&
+                    finding.neurons.some((id) => !anchors.has(id)))
+            ) {
+                throw new Error(
+                    'A knowledge finding must quote its affected claim; a contradiction or relation must quote both endpoints.',
+                );
+            }
+        }
         if (finding.neurons.some((id) => !neurons.has(id))) {
             throw new Error('Finding references a neuron outside the reviewed scope.');
         }
@@ -134,7 +164,10 @@ export function validate(
         }
     }
 
-    if (output.findings.length || output.checks.some((check) => check.verdict !== 'supported')) {
+    if (
+        output.findings.length ||
+        output.checks.some((check) => !['supported', 'consistent'].includes(check.verdict))
+    ) {
         output.verdict = 'needs-review';
     }
 
@@ -147,6 +180,11 @@ export function validate(
 
 export function validateReviewOutput(output: ReviewOutput, bundle: ReviewBundle, body?: string) {
     const parsed = reviewOutputSchema.parse(output);
+    for (const policy of parsed.sourcePolicies ?? []) {
+        if (!bundle.sources.some((source) => source.id === policy.source)) {
+            throw new Error('Source policy references an unsupplied source.');
+        }
+    }
 
     if (body !== undefined) {
         const ids = new Set(bundle.members.map(({ neuron }) => neuron.id));

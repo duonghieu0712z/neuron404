@@ -32,14 +32,26 @@ export const reviewFindingSchema = z.object({
         })
         .nullable(),
 });
+export const sourcePolicySchema = z.object({
+    source: z.string().regex(/^[a-f0-9]{64}$/),
+    schedule: z.enum(['daily', 'weekly', 'monthly']),
+    reason: z.string().min(20).max(1000),
+});
 export const reviewOutputSchema = z.object({
+    sourcePolicies: z.array(sourcePolicySchema).max(20).optional(),
     verdict: z.enum(['pass', 'needs-review']),
     summary: z.string().min(20).max(3000),
     checks: z
         .array(
             z.object({
                 subject: z.string(),
-                verdict: z.enum(['supported', 'partial', 'unsupported', 'unverifiable']),
+                verdict: z.enum([
+                    'supported',
+                    'consistent',
+                    'partial',
+                    'unsupported',
+                    'unverifiable',
+                ]),
                 reason: z.string().min(10).max(1500),
                 evidence: z.array(reviewEvidenceSchema).max(8),
             }),
@@ -56,7 +68,13 @@ export type ReviewFinding = z.infer<typeof reviewFindingSchema> & {
 };
 export interface ReviewReport {
     id: string;
-    version: 1;
+    version: 1 | 2;
+    reviewedInputCurrent?: boolean;
+    requestGeneration?: number;
+    scopeSetRevision?: string;
+    selection?: Record<string, string>;
+    catalog?: { id: string; revision: string; title: string; cues: string[] }[];
+    scope?: { neuron: string; part: number; total: number; description: string };
     kind: 'knowledge' | 'overview';
     region: string;
     createdAt: string;
@@ -71,6 +89,7 @@ export interface ReviewReport {
     summary: string;
     verdict: ReviewOutput['verdict'];
     checks: ReviewOutput['checks'];
+    sourcePolicies?: ReviewOutput['sourcePolicies'];
     findings: ReviewFinding[];
 }
 export interface ReviewView extends ReviewReport {

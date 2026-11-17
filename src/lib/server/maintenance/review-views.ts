@@ -16,7 +16,9 @@ import { readSource } from '#lib/server/neuron/sources';
 import { CONTENT_DIR, fingerprint } from '#lib/server/neuron/storage';
 import { readNeuronSnapshot } from '#lib/server/neuron/store';
 
+import { readNeuronReviews } from './neuron-reports';
 import { optional, readDecisions, readLatestReport } from './report-storage';
+import { scanNeurons } from './scanner';
 
 export async function readRegionReviews(
     regionId: string,
@@ -174,5 +176,8 @@ export async function listReviewReports() {
         result.push(...(await readRegionReviews(region.id)));
     }
 
+    for (const { neuron } of (await scanNeurons()).snapshots) {
+        result.push(...(await readNeuronReviews(neuron.id)));
+    }
     return result;
 }

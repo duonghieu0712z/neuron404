@@ -9,6 +9,8 @@ import { regionIdSchema } from '#lib/neuron/schema';
 import { DATA_DIR } from '#lib/server/data-dir';
 import { atomicWrite, fingerprint, withStorageLock } from '#lib/server/neuron/storage';
 
+import { listArtifacts, saveArtifact } from './artifacts';
+import { listDisputes } from './disputes';
 import { decisionsSchema, hashSchema, reportSchema } from './report-schema';
 
 export const directory = path.join(DATA_DIR, 'maintenance');
@@ -63,7 +65,15 @@ export async function readLatestReport(region: string, kind: ReviewReport['kind'
     );
 
     if (raw === null) {
-        return null;
+        const imported = (await listArtifacts('report'))
+            .filter(
+                (item) =>
+                    item.payload.region === region &&
+                    item.payload.kind === kind &&
+                    !item.payload.scope,
+            )
+            .at(-1);
+        return imported ? reportSchema.parse(imported.payload) : null;
     }
 
     const { id } = z.object({ id: hashSchema }).parse(JSON.parse(raw));
@@ -78,6 +88,10 @@ export async function readLatestReport(region: string, kind: ReviewReport['kind'
 
 export async function readReport(id: string) {
     hashSchema.parse(id);
+    const artifact = (await listArtifacts('report')).find((item) => item.payload.id === id);
+    if (artifact) {
+        return reportSchema.parse(artifact.payload);
+    }
     let regions: string[];
 
     try {
@@ -109,7 +123,28 @@ export async function readReport(id: string) {
 
 export async function readDecisions() {
     const raw = await optional(path.join(directory, 'decisions.json'));
-    return raw === null ? {} : decisionsSchema.parse(JSON.parse(raw));
+    const decisions = raw === null ? {} : decisionsSchema.parse(JSON.parse(raw));
+    for (const dispute of await listDisputes()) {
+        for (const event of dispute.events) {
+            if (
+                typeof event.payload.finding === 'string' &&
+                typeof event.payload.report === 'string'
+            ) {
+                const latest = dispute.events.at(-1)!;
+                if (dispute.status === 'resolved' || dispute.status === 'dismissed') {
+                    decisions[event.payload.finding] = {
+                        status: dispute.status,
+                        note: String(latest.payload.note),
+                        report: event.payload.report,
+                        at: latest.at,
+                    };
+                } else {
+                    delete decisions[event.payload.finding];
+                }
+            }
+        }
+    }
+    return decisions;
 }
 
 export async function openReviewFindings(report: ReviewReport) {
@@ -204,6 +239,29 @@ export async function decideFinding(
             throw new Error('Finding not found in the specified report.');
         }
 
+        const events = (await listArtifacts('dispute')).filter(
+            (event) => event.payload.finding === findingId,
+        );
+        if (events.length) {
+            const parentIds = new Set(events.flatMap((event) => event.parents));
+            const heads = events.filter((event) => !parentIds.has(event.id));
+            if (heads.length !== 1) {
+                throw new Error(
+                    'Dispute decision conflict. Resolve current heads through dispute:resolve.',
+                );
+            }
+            const previous = events.at(-1)!;
+            await saveArtifact({
+                version: 1,
+                type: 'dispute',
+                at: new Date().toISOString(),
+                neurons: previous.neurons,
+                sources: previous.sources,
+                regions: previous.regions,
+                parents: heads.map((event) => event.id),
+                payload: { ...previous.payload, action: status, note, author: 'user' },
+            });
+        }
         const decisions = await readDecisions();
         decisions[findingId] = { status, note, report: reportId, at: new Date().toISOString() };
         await atomicWrite(

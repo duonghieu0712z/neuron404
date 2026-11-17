@@ -79,7 +79,11 @@ export function referenceInput(bundle: ReviewBundle, body?: string) {
         changedMembers: bundle.changed,
         priorOpenFindings: bundle.previousReport?.findings ?? [],
         coverage:
-            'All Region members, direct semantic neighbors and replacements, and up to three title/alias matches outside the Region. This is not an exhaustive comparison of every pair in the store. External sources were not refreshed.',
+            bundle.scope?.description ??
+            'Members, direct neighbors, shared-source and lexical candidates. Not an exhaustive all-pairs comparison. Source snapshots are historical evidence.',
+        selection: bundle.selection,
+        catalog: bundle.catalog,
+        scope: bundle.scope,
     });
     return { input, evidence };
 }
