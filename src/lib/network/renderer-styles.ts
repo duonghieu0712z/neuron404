@@ -25,9 +25,10 @@ export function createSigmaRenderer(
         primitives: {
             depthLayers: [
                 ...DEFAULT_DEPTH_LAYERS,
-                'regionLabels',
-                'selectedLabels',
-                'hoveredLabels',
+                'regionNodes',
+                'selectedNodes',
+                'hoveredNodes',
+                'labels',
             ],
             nodes: { shapes: [sdfCircle(), regionHexagon()] },
             edges: {
@@ -59,6 +60,8 @@ export function createSigmaRenderer(
                 labelSize: 12,
                 labelFont: 'Inter Variable, sans-serif',
                 labelPosition: 'below',
+                // Sigma caches one label buffer across depth passes.
+                labelDepth: 'labels',
                 backdropColor: surface,
                 backdropBorderColor: { attribute: 'color' },
                 backdropBorderWidth: 1,
@@ -75,9 +78,9 @@ export function createSigmaRenderer(
                 !state.matchesSearch(id) && !expanded && !state.neighborhood.has(id);
             const dimmedColor = dimmedColors.get(attributes.color);
 
-            const labelDepth = (
-                ['nodes', 'regionLabels', 'selectedLabels', 'hoveredLabels'] as const
-            )[state.focusPriority(id)];
+            const nodeDepth = (['nodes', 'regionNodes', 'selectedNodes', 'hoveredNodes'] as const)[
+                state.focusPriority(id)
+            ];
 
             if (state.activeEdge || state.activeMembership) {
                 const highlighted = state.edgeEndpoints.has(id);
@@ -89,8 +92,7 @@ export function createSigmaRenderer(
                     label: nodeAttributes.label,
                     labelVisibility: highlighted && placement ? 'visible' : 'hidden',
                     labelPosition: placement ?? 'below',
-                    labelDepth,
-                    depth: highlighted ? labelDepth : 'nodes',
+                    depth: highlighted ? nodeDepth : 'nodes',
                     backdropArea: 'both',
                     backdropVisibility: highlighted && placement ? 'visible' : 'hidden',
                 };
@@ -102,8 +104,7 @@ export function createSigmaRenderer(
                     label: nodeAttributes.label,
                     labelVisibility: 'visible',
                     labelPosition: 'below',
-                    labelDepth,
-                    depth: expanded ? labelDepth : 'nodes',
+                    depth: expanded ? nodeDepth : 'nodes',
                     color: searchDimmed ? dimmedColor : attributes.color,
                     opacity: 1,
                     backdropArea: 'both',
@@ -135,7 +136,6 @@ export function createSigmaRenderer(
                     label,
                     labelVisibility,
                     labelPosition: placement ?? 'below',
-                    labelDepth,
                 };
             }
 
@@ -148,8 +148,7 @@ export function createSigmaRenderer(
                 opacity: 1,
                 labelVisibility,
                 labelPosition: placement ?? 'below',
-                labelDepth,
-                depth: expanded ? labelDepth : 'nodes',
+                depth: expanded ? nodeDepth : 'nodes',
                 backdropArea: 'both',
                 backdropVisibility: expanded && placement ? 'visible' : 'hidden',
             };
