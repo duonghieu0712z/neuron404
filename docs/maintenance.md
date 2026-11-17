@@ -1,79 +1,34 @@
-# Background Region maintenance
+# Knowledge maintenance
 
-Maintenance is **disabled by default**. In a source checkout, `pnpm maintenance` runs the same worker as the installed `neuron404 maintenance` command. With no `NEURON404_MAINTENANCE_PROVIDER` (or with `none`),
-`neuron404 maintenance` exits without claiming jobs, writing state, or calling a model. It never selects
-Claude or Codex automatically, including when both CLIs are installed.
-
-To enable it, explicitly choose `claude` or `codex` and use that CLI's existing login. The host worker
-audits source fidelity, checks related knowledge, and maintains Region overviews. Docker shares the
-same `~/.neuron404` store; its image does not install agent CLIs or copy login credentials.
+Maintenance is disabled until `NEURON404_MAINTENANCE_PROVIDER` explicitly selects `claude` or `codex`. No CLI, model or login is installed or selected automatically. The web development server, production web server and headless API start the configured worker; build does not. The process singleton prevents duplicate loops during hot reload, and persisted leases prevent concurrent model calls across processes sharing the store. A host can also run `pnpm maintenance` independently of Docker.
 
 ```sh
-NEURON404_MAINTENANCE_PROVIDER=claude neuron404 maintenance
-NEURON404_MAINTENANCE_PROVIDER=codex neuron404 maintenance
-neuron404 maintenance --status
-neuron404 maintenance --once
-neuron404 maintenance --overview --once
-neuron404 maintenance --audit --once
-neuron404 maintenance --reports
-neuron404 maintenance --report REPORT_ID
-neuron404 maintenance --retry-failed --once
+pnpm maintenance --once
+pnpm maintenance --audit --once
+pnpm maintenance --overview --once
+pnpm neuron review:status
+pnpm neuron review:request NEURON_ID
+pnpm neuron review:reports
+pnpm neuron review:read REPORT_ID
+pnpm neuron dispute:list
+pnpm neuron dispute:read DISPUTE_ID
+pnpm neuron source:refresh SOURCE_ID
 ```
 
-Set the provider in the worker's process environment; source installations can also use the repository's `.env`. The remaining commands use that explicit selection.
-`--status` and report-reading commands work while maintenance is disabled. An invalid or unavailable
-provider fails without falling back to another agent. No model is hard-coded: the optional
-`NEURON404_MAINTENANCE_MODEL` overrides the selected CLI's own model default.
+The scanner reads files independently and records errors without blocking valid neurons or requiring a successful index rebuild. Each neuron, including unfiled and historical neurons, has revision-specific work with continuation scopes when input is large. Source and context excerpts retain original positions. Region overviews remain a separate task. Coverage describes what was actually supplied, not exhaustive all-pairs comparison or independent confirmation of truth. Source fidelity, cross-check findings, infrastructure completion and unverifiable content remain distinct.
 
-A pass processes at most one job. The default daemon polls every 30 seconds and waits for 60 seconds
-of stable revisions; `--once` bypasses that settling delay. It does not install an OS service.
-Overviews are generated and checked in separate ephemeral agent sessions. Every paragraph must
-have a check backed by an exact member quote; unknown citations and invented quotations are rejected.
-Only a passing candidate is published through the existing revision/history service. A rejected
-candidate leaves the current article unchanged. Existing fresh overviews without a matching review
-are checked without rewriting them.
+Candidate selection uses direct incoming/outgoing relations, replacement chains, shared sources, folded content/alias/retrieval-cue overlap and a stable rotating catalog page. BM25 retains partial term matches after stronger matches and respects Region/lifecycle filters. No embedding model or vector database is used. Catalog discovery is orientation; conclusions require actual excerpts.
 
-Knowledge audits compare every Region member with its own supplied source snapshots. They also
-read direct semantic neighbors/replacements and up to three title/alias candidates outside the
-Region to look for contradictions, obsolete claims, duplicates, substantive missing synapses, and
-missing concepts. This is not an exhaustive all-pairs comparison. Changed member and neighbor
-revisions trigger another audit; unchanged inputs are audited again in seven-day periods by default.
-Missing evidence means unverifiable, not false. Sources are not fetched again, so fidelity checks
-cannot establish independent real-world truth or discover every external change.
+HTTP/HTTPS sources and URLs recorded in neuron bodies are refreshed with bounded requests, validated public DNS addresses pinned to each connection, conditional headers, redirect limits and a 512 KB response limit. Text, UTF-8 HTML and JSON are supported. Raw bytes (base64), their hash, extraction version, timestamps and immutable extracted snapshots are retained. Layout-only whitespace changes do not invalidate semantic review. A 304 indicates unchanged HTTP resource state, not correct knowledge. Errors and unsupported formats are recorded without retracting neurons. File refresh requires `NEURON404_SOURCE_ROOTS` containing a JSON array of explicitly registered source directories; arbitrary historical paths are not read.
 
-Reports are immutable and content-hashed under `~/.neuron404/maintenance/reports/`. They retain input
-revisions, reviewed scope, evidence checks, exact quotes, and proposals. Open findings carry into
-later knowledge reports with their origin report. Reports appear in Region and neuron sidebars and
-are returned by `neuron404 read`; stale reports are labeled when supporting inputs change.
-`neuron404 review:reports` and `review:read ID` also expose them to agents. Review events, overview
-publication, failures, and finding decisions are recorded in `maintenance/events.jsonl`.
+Sources default to weekly refresh; daily and monthly policies can be recorded by the source refresh command, with a reason required for monthly. Scheduling is an operating policy, not a truth expiry date. Changed evidence is supplied alongside old snapshots for dependent review.
 
-Neuron bodies, synapses, source snapshots, and lifecycle states are never modified by the worker.
-Apply an authorized correction through the normal knowledge workflow, then explicitly record its
-finding decision; neither command below edits knowledge or marks it human-verified:
+New reports, dispute events, refresh evidence and repair receipts are immutable hashed artifacts under `content/maintenance/`. Original version-1 reports remain intact under `maintenance/reports/` and can be imported without changing their hashes. New per-neuron reports use version 2 with explicit scopes. Dispute states are open, waiting for evidence, resolved and dismissed. Comments and all prior arguments remain visible; concurrent decision heads are conflicts. Source counts and timestamps do not determine which claim wins.
 
-```sh
-neuron404 maintenance --report REPORT_ID --resolve FINDING_ID --note "Corrected the claim and checked its evidence."
-neuron404 maintenance --report REPORT_ID --dismiss FINDING_ID --note "Reviewed the finding; its interpretation does not apply."
-```
+A report can prepare one focused Proposal with original evidence. Another model session receives before/after content and original sources, independently verifies the entire patch, and can reject it. Code checks exact quotes, references, source IDs, patch size, revisions and lease ownership. Supported small patches can be applied through the existing Proposal revision service. Personal/original decisions, unresolved contradictions and broad changes remain reviewable Proposals. The worker never deletes or merges neurons, changes lifecycle or assigns human endorsement. Missing evidence waits for evidence rather than forcing approval. Rejected inputs do not repeat indefinitely; infrastructure errors use bounded retries. Post-write failures retain the prepared target revision for recovery without overwriting newer edits.
 
-When enabled, defaults are 4 reserved CLI requests per hour, a 120-second timeout per call, and 3 attempts
-per unchanged job with backoff. An overview refresh reserves two requests for generation and review;
-an audit or a check of an existing overview reserves one. Failed or interrupted jobs conservatively
-consume their reservation. The shared state and leases in `maintenance/state.json` prevent duplicate
-claims and recover expired jobs; limits persist across restarts. Claude invocations also receive a `$0.50` estimated API-cost cap. Codex has no equivalent CLI dollar
-cap; its adapter uses the shared request, input-size, timeout and retry limits. The Claude estimate
-is not a subscription invoice or a guaranteed billing limit. See
-[Claude CLI](https://code.claude.com/docs/en/headless) and
-[Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode).
+Default limits are one model call at a time, four reserved calls per hour, 120 seconds per call and three infrastructure attempts. Review and repair work alternate when available; oldest review jobs run first. Requests are reserved before a call and remain consumed after interruption. A repair may require several passes. Queue, leases and rate windows are machine-local under `maintenance/state.json` and are not synced.
 
-Configure the commented `NEURON404_MAINTENANCE_*` variables in `.env.example`.
-`NEURON404_MAINTENANCE_CLI` optionally overrides the selected agent's executable; it is not a shell
-command. Claude runs with tools, MCP, hooks, skills and persistence disabled. Codex uses an ephemeral
-read-only run without user config/rules, with command execution, web search, apps, plugins, hooks,
-and subagents disabled. Its existing authentication is retained. Both run in a temporary directory
-and return schema-validated output; only neuron404 writes knowledge. Oversized evidence is blocked
-rather than truncated. Fix issues and inspect the report before `--retry-failed`. Ordinary queries
-never start maintenance or call a review model.
+Sync protocol 3 carries immutable maintenance artifacts plus Proposals, reading paths and their history. Both peers must support the protocol before writes. Scoped sync includes only artifacts whose recorded neuron/Region dependencies fit the selected scope and includes their necessary source snapshots. Missing parents/context remains incomplete, preventing automatic resolution. Concurrent immutable events are retained rather than resolved by last-write-wins. No remote sync is initiated by maintenance.
 
-For adapter extension points and scheduling responsibilities, see [maintenance integrations](architecture.md#maintenance-integrations).
+`dispute:open`, `dispute:comment` and `dispute:resolve` use JSON payloads with `neurons`, `author`, `note`, optional exact `evidence` and `expectedHeads` for updates. Resolution accepts `status`: `waiting-evidence`, `resolved` or `dismissed`. Existing report and finding-decision commands remain available. Review requests and source refresh requests queue work rather than calling the model in HTTP handlers.
