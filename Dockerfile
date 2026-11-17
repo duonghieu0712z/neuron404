@@ -1,5 +1,5 @@
 FROM ghcr.io/pnpm/pnpm:alpine AS base
-RUN pnpm runtime set node 24 --global
+RUN pnpm runtime set node 26 --global
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
