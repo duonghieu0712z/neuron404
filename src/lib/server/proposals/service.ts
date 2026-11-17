@@ -7,8 +7,11 @@ import { z } from 'zod';
 
 import { neuronFrontmatterSchema } from '#lib/neuron/schema';
 import { deriveProposalChanges } from '#lib/proposals/changes';
+import { assertReviewDependencies } from '#lib/server/maintenance/dependencies';
+import { readDispute } from '#lib/server/maintenance/disputes';
+import { readMaintenanceState } from '#lib/server/maintenance/worker-state';
 import { fingerprint, withStorageLock } from '#lib/server/neuron/storage';
-import { readAllNeurons, readNeuronSnapshot } from '#lib/server/neuron/store';
+import { readNeuronSnapshot } from '#lib/server/neuron/store';
 import { commitNeuron, validateNeuronReferences } from '#lib/server/neuron/write';
 
 import { proposalInputSchema } from './schema';
@@ -27,11 +30,8 @@ async function validateProposalContent(neuron: import('#lib/neuron/schema').Neur
         }
     }
 
-    const ids = new Set((await readAllNeurons()).map((item) => item.id));
-    ids.add(neuron.id);
-
     for (const match of neuron.body.matchAll(/\]\(neuron:([a-zA-Z0-9_-]+)\)/g)) {
-        if (!ids.has(match[1])) {
+        if (match[1] !== neuron.id && !(await readNeuronSnapshot(match[1]).catch(() => null))) {
             throw new Error(`Unknown neuron reference: ${match[1]}`);
         }
     }
@@ -76,6 +76,10 @@ export async function createProposal(neuronId: string, payload: unknown) {
 }
 
 const resolutionSchema = z.object({
+    reviewDependencies: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).optional(),
+    evidenceSources: z.array(z.string().regex(/^[a-f0-9]{64}$/)).optional(),
+    disputeHeads: z.record(z.string(), z.array(z.string())).optional(),
+    maintenanceLease: z.object({ key: z.string(), owner: z.string() }).optional(),
     expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
     accepted: z.array(z.string()).max(2000),
 });
@@ -112,6 +116,31 @@ export async function resolveProposal(db: Db, id: string, payload: unknown) {
             return readProposal(id);
         }
 
+        for (const [dispute, heads] of Object.entries(input.disputeHeads ?? {})) {
+            const current = await readDispute(dispute);
+            if (
+                current.incomplete ||
+                current.status === 'conflict' ||
+                current.status === 'resolved' ||
+                current.status === 'dismissed' ||
+                JSON.stringify([...current.heads].sort()) !== JSON.stringify([...heads].sort())
+            ) {
+                throw new Error('Dispute changed during verification.');
+            }
+        }
+        if (input.maintenanceLease) {
+            const job = (await readMaintenanceState()).jobs[input.maintenanceLease.key];
+            if (
+                job?.owner !== input.maintenanceLease.owner ||
+                job.status !== 'running' ||
+                (job.leaseUntil ?? 0) <= Date.now()
+            ) {
+                throw new Error('Maintenance lease expired.');
+            }
+        }
+        if (input.reviewDependencies) {
+            await assertReviewDependencies(input.reviewDependencies, input.evidenceSources ?? []);
+        }
         const current = await readNeuronSnapshot(proposal.neuronId);
 
         if (current.revision !== proposal.baseRevision) {

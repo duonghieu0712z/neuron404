@@ -4,17 +4,17 @@ import type { ReviewOutput } from '#lib/neuron/review';
 import { writeRegionOverviewUnlocked } from '#lib/server/neuron/region-overview';
 import { readRegions } from '#lib/server/neuron/regions';
 
-import {
-    auditKnowledge,
-    buildReviewBundle,
-    makeReport,
-    validateReviewOutput,
-    verifyOverview,
-} from './evaluate';
+import { auditKnowledge, makeReport, validateReviewOutput, verifyOverview } from './evaluate';
+import { importLegacyReviews } from './legacy';
 import { generateOverview } from './model';
+import { saveNeuronReport } from './neuron-reports';
+import { neuronScopes } from './neuron-scope';
+import { processRepairs } from './repairs';
 import { recordMaintenanceEvent, saveReportUnlocked } from './reports';
+import { applySourcePolicies } from './source-policy';
+import { refreshDueSource } from './source-refresh';
 import { claimWork, ownBundle, sameArtifacts, snapshots, type MaintenanceMode } from './work-queue';
-import { hour, withState } from './worker-state';
+import { hour, withState, readMaintenanceState } from './worker-state';
 
 export type { MaintenanceMode } from './work-queue';
 
@@ -37,9 +37,31 @@ export async function runMaintenancePass(
     }
 
     signal?.throwIfAborted();
+    await importLegacyReviews();
+    try {
+        await refreshDueSource(signal);
+    } catch (error) {
+        signal?.throwIfAborted();
+        await withState(async (state) => {
+            state.scanErrors['source-refresh'] = String(error);
+        });
+    }
+    const repair =
+        mode !== 'overview' && (await readMaintenanceState()).lastWork !== 'repair'
+            ? await processRepairs(config, signal)
+            : null;
+    if (repair) {
+        return repair;
+    }
     const task = await claimWork(config, mode);
 
     if (!task) {
+        if (mode !== 'overview') {
+            const pendingRepair = await processRepairs(config, signal);
+            if (pendingRepair) {
+                return pendingRepair;
+            }
+        }
         return { status: 'idle' as const };
     }
 
@@ -75,30 +97,39 @@ export async function runMaintenancePass(
 
             const currentRegion = (await readRegions()).find((region) => region.id === task.region);
 
-            if (!currentRegion) {
+            if (!currentRegion && !task.neuron) {
                 throw new Error('Region was removed during review.');
             }
 
             const all = await snapshots();
 
-            const current =
-                task.kind === 'knowledge'
-                    ? await buildReviewBundle(currentRegion, all)
-                    : ownBundle(
-                          currentRegion,
-                          all.filter(
-                              ({ neuron }) =>
-                                  neuron.lifecycle === 'active' &&
-                                  neuron.regions.includes(task.region),
-                          ),
-                      );
-
-            const report = await saveReportUnlocked(
-                makeReport(task.kind, task.bundle, task.fingerprint, output, body),
-            );
+            let current: typeof task.bundle | undefined;
+            if (task.neuron) {
+                const snapshot = all.find(({ neuron }) => neuron.id === task.neuron);
+                if (snapshot) {
+                    current = (await neuronScopes(snapshot, all, config))[task.bundle.scope!.part];
+                }
+            } else {
+                current = ownBundle(
+                    currentRegion!,
+                    all.filter(
+                        ({ neuron }) =>
+                            neuron.lifecycle === 'active' && neuron.regions.includes(task.region),
+                    ),
+                );
+            }
+            const matches = current !== undefined && sameArtifacts(task.bundle, current);
+            const reportInput = makeReport(task.kind, task.bundle, task.fingerprint, output, body);
+            if (task.neuron) {
+                reportInput.reviewedInputCurrent = matches;
+                reportInput.requestGeneration = task.requestGeneration ?? 0;
+                reportInput.scopeSetRevision = task.scopeSetRevision;
+            }
+            const report = task.neuron
+                ? await saveNeuronReport(reportInput)
+                : await saveReportUnlocked(reportInput);
             job.report = report.id;
-
-            if (!sameArtifacts(task.bundle, current)) {
+            if (!matches) {
                 job.status = 'pending';
                 job.nextAttemptAt = Date.now() + config.settleMs;
                 delete job.owner;
@@ -110,6 +141,10 @@ export async function runMaintenancePass(
                     reason: 'Input revisions changed during review.',
                 });
                 return { status: 'discarded' as const, region: task.region, report: report.id };
+            }
+
+            if (task.kind === 'knowledge') {
+                await applySourcePolicies(output.sourcePolicies);
             }
 
             if (task.kind === 'overview' && report.verdict !== 'pass') {
@@ -137,6 +172,17 @@ export async function runMaintenancePass(
                 });
             }
 
+            if (task.neuron) {
+                job.revision = task.bundle.members[0].revision;
+            }
+            job.outcome = 'issues';
+            if (report.verdict === 'pass') {
+                job.outcome = report.checks.some((check) => check.verdict === 'consistent')
+                    ? 'consistent'
+                    : 'supported';
+            } else if (report.checks.every((check) => check.verdict === 'unverifiable')) {
+                job.outcome = 'unverifiable';
+            }
             job.status = 'succeeded';
             job.completedAt = Date.now();
             delete job.owner;

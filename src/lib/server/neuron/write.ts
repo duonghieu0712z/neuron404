@@ -2,6 +2,7 @@ import type { Neuron } from '#lib/neuron/schema';
 import type { Db } from '#lib/server/db/client';
 
 import { neuronFrontmatterSchema } from '#lib/neuron/schema';
+import { markReviewDirtyUnlocked } from '#lib/server/maintenance/dirty';
 
 import { synchronizeIndexUnlocked } from './indexer';
 import { readPartialReferences } from './partial-references';
@@ -10,7 +11,7 @@ import { readSource } from './sources';
 import { fingerprint, markIndexDirty } from './storage';
 import {
     archiveNeuron,
-    readAllNeurons,
+    listNeuronFiles,
     readNeuronSnapshot,
     recordOperation,
     writeNeuron,
@@ -19,7 +20,14 @@ import {
 export async function validateNeuronReferences(neuron: Neuron) {
     const partial = await readPartialReferences();
     const regions = new Set((await readRegions()).map((region) => region.id));
-    const existing = new Map((await readAllNeurons()).map((item) => [item.id, item]));
+    const snapshots = await Promise.all(
+        (await listNeuronFiles()).map((name) =>
+            readNeuronSnapshot(name.slice(0, -3)).catch(() => null),
+        ),
+    );
+    const existing = new Map(
+        snapshots.filter((item) => item !== null).map(({ neuron }) => [neuron.id, neuron]),
+    );
     existing.set(neuron.id, neuron);
     for (const id of neuron.regions) {
         if (!regions.has(id) && !partial[neuron.id]?.regions.includes(id)) {
@@ -55,6 +63,17 @@ export async function validateNeuronReferences(neuron: Neuron) {
     }
 }
 
+export class NeuronPostWriteError extends Error {
+    constructor(
+        message: string,
+        readonly stage: 'archive' | 'journal' | 'index',
+        readonly revision: string,
+        cause: unknown,
+    ) {
+        super(message, { cause });
+    }
+}
+
 export async function commitNeuron(db: Db, neuron: Neuron, previousRaw?: string) {
     await validateNeuronReferences(neuron);
     if (previousRaw !== undefined) {
@@ -64,19 +83,25 @@ export async function commitNeuron(db: Db, neuron: Neuron, previousRaw?: string)
     const { body, ...frontmatter } = neuron;
     await writeNeuron(neuronFrontmatterSchema.parse(frontmatter), body);
     const saved = await readNeuronSnapshot(neuron.id);
+    await markReviewDirtyUnlocked(neuron.id);
+    let stage: 'archive' | 'journal' | 'index' = 'archive';
     try {
         await archiveNeuron(neuron.id, saved.raw);
+        stage = 'journal';
         await recordOperation(
             previousRaw === undefined ? 'create' : 'update',
             neuron.id,
             saved.revision,
             previousRaw === undefined ? undefined : fingerprint(previousRaw),
         );
+        stage = 'index';
         await synchronizeIndexUnlocked(db);
     } catch (error) {
-        throw new Error(
+        throw new NeuronPostWriteError(
             `Neuron ${neuron.id} was saved at revision ${saved.revision}, but post-write processing failed. Read the saved neuron before retrying; run neuron index to recover its index. ${String(error)}`,
-            { cause: error },
+            stage,
+            saved.revision,
+            error,
         );
     }
     return { ...saved.neuron, revision: saved.revision };

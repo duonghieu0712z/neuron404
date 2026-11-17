@@ -40,8 +40,14 @@ export async function lintNeurons(): Promise<LintIssue[]> {
     const validNeurons = new Map<string, NeuronFrontmatter>();
 
     for (const fileName of fileNames) {
-        const raw = await readFile(path.join(NEURONS_DIR, fileName), 'utf-8');
-        const parsed = matter(raw);
+        let parsed: ReturnType<typeof matter>;
+        try {
+            const raw = await readFile(path.join(NEURONS_DIR, fileName), 'utf-8');
+            parsed = matter(raw);
+        } catch (error) {
+            issues.push({ fileName, kind: 'invalid-frontmatter', message: String(error) });
+            continue;
+        }
         const result = neuronFrontmatterSchema.safeParse(parsed.data);
 
         if (!result.success) {
