@@ -19,7 +19,7 @@ export interface SearchOptions {
 }
 
 function searchQuery(query: string, options: SearchOptions = {}) {
-    const tokens = [...new Set(query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])].filter(
+    const tokens = [...new Set(fold(query).match(/[\p{L}\p{N}]+/gu) ?? [])].filter(
         (word) => !STOP_WORDS.has(fold(word)),
     );
 
@@ -40,7 +40,6 @@ function searchQuery(query: string, options: SearchOptions = {}) {
         ),
         sql` UNION ALL `,
     );
-    const minimum = Math.max(1, Math.ceil(tokens.length * 0.6));
     const regionFilter = options.region
         ? sql`AND EXISTS (SELECT 1 FROM json_each(n.regions) WHERE value = ${options.region})`
         : sql``;
@@ -50,7 +49,7 @@ function searchQuery(query: string, options: SearchOptions = {}) {
         tokens,
         coverage: sql`WITH term_matches AS (${matches}), coverage AS (
             SELECT neuron_rowid, COUNT(*) AS matched, GROUP_CONCAT(term) AS matched_terms
-            FROM term_matches GROUP BY neuron_rowid HAVING COUNT(*) >= ${minimum}
+            FROM term_matches GROUP BY neuron_rowid
         )`,
         filter: sql`WHERE neurons_fts MATCH ${matchQuery} ${regionFilter} ${lifecycleFilter}`,
     };
@@ -66,7 +65,7 @@ export async function searchNeuronIds(db: Db, query: string) {
     const result = await db.run(sql`${search.coverage}
         SELECT f.id FROM neurons_fts AS f JOIN neurons AS n ON n.id = f.id
         JOIN coverage AS c ON c.neuron_rowid = f.rowid
-        ${search.filter} ORDER BY c.matched DESC, bm25(neurons_fts, 0, 8, 1, 5, 6), f.id
+        ${search.filter} ORDER BY c.matched DESC, bm25(neurons_fts, 0, 8, 1, 5, 6, 1), f.id
     `);
 
     return result.rows.map((row) => String(row.id));
@@ -100,7 +99,7 @@ export async function searchNeurons(
         SELECT f.id, f.title, n.retrieval_cues,
             n.revision, n.lifecycle, n.grounding, n.endorsement, n.regions, c.matched_terms,
             snippet(neurons_fts, 2, '[', ']', '…', 24) AS snippet,
-            bm25(neurons_fts, 0, 8, 1, 5, 6) AS rank
+            bm25(neurons_fts, 0, 8, 1, 5, 6, 1) AS rank
         FROM neurons_fts AS f JOIN neurons AS n ON n.id = f.id
         JOIN coverage AS c ON c.neuron_rowid = f.rowid
         ${search.filter}

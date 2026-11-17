@@ -5,6 +5,8 @@ import { count, eq, sql } from 'drizzle-orm';
 
 import { neuronIndexState, neurons, synapses } from '#lib/server/db/schema';
 
+import { fold } from './search';
+
 interface IndexedSnapshot {
     neuron: Neuron;
     revision: string;
@@ -35,7 +37,7 @@ export async function persistIndexChanges(db: Db, changes: IndexChanges) {
         }
 
         await tx.run(sql`CREATE VIRTUAL TABLE IF NOT EXISTS neurons_fts USING fts5(
-            id UNINDEXED, title, body, aliases, retrieval_cues,
+            id UNINDEXED, title, body, aliases, retrieval_cues, normalized,
             tokenize='unicode61 remove_diacritics 2'
         )`);
 
@@ -71,8 +73,8 @@ export async function persistIndexChanges(db: Db, changes: IndexChanges) {
                 .values(values)
                 .onConflictDoUpdate({ target: neurons.id, set: values });
             await tx.run(sql`DELETE FROM neurons_fts WHERE id = ${neuron.id}`);
-            await tx.run(sql`INSERT INTO neurons_fts (id, title, body, aliases, retrieval_cues)
-                VALUES (${neuron.id}, ${neuron.title}, ${neuron.body}, ${neuron.aliases.join(' ')}, ${neuron.retrievalCues.join(' ')})`);
+            await tx.run(sql`INSERT INTO neurons_fts (id, title, body, aliases, retrieval_cues, normalized)
+                VALUES (${neuron.id}, ${neuron.title}, ${neuron.body}, ${neuron.aliases.join(' ')}, ${neuron.retrievalCues.join(' ')}, ${fold([neuron.title, neuron.body, ...neuron.aliases, ...neuron.retrievalCues].join(' '))})`);
         }
 
         for (const { neuron } of changed) {

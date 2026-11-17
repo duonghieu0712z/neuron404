@@ -15,7 +15,7 @@ import { CONTENT_DIR, withStorageLock } from './storage';
 import { listNeuronFiles, NEURONS_DIR, readNeuronSnapshot } from './store';
 
 export const INDEX_RECHECK_MS = 30_000;
-const STATE_ID = `retrieval-v1:${CONTENT_DIR}`;
+const STATE_ID = `retrieval-v2:${CONTENT_DIR}`;
 
 async function fileStamp(file: string) {
     try {
@@ -89,7 +89,7 @@ export async function synchronizeIndexUnlocked(db: Db, force = false, maxAgeMs =
 
     const previous = new Map(existing.map((row) => [row.id, row]));
     const fts = await db.run(sql`PRAGMA table_info(neurons_fts)`);
-    const recreateFts = !fts.rows.some((row) => row.name === 'retrieval_cues');
+    const recreateFts = !fts.rows.some((row) => row.name === 'normalized');
 
     const files = await mapFiles(await listNeuronFiles(), async (name) => ({
         id: name.slice(0, -3),
