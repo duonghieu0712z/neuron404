@@ -38,8 +38,7 @@
             return (
                 page.url.pathname === '/neurons' ||
                 (page.url.pathname.startsWith('/neurons/') &&
-                    !page.url.pathname.startsWith('/neurons/lint') &&
-                    !page.url.pathname.startsWith('/neurons/new'))
+                    !page.url.pathname.startsWith('/neurons/lint'))
             );
         }
 
@@ -81,12 +80,6 @@
                     <Button type="submit" variant="ghost" size="sm">Sign out</Button>
                 </form>
             {/if}
-            <Button
-                href={resolve('/neurons/new')}
-                variant={isActive('/neurons/new') ? 'secondary' : 'default'}
-            >
-                New neuron
-            </Button>
             <Tooltip>
                 <TooltipTrigger>
                     {#snippet child({ props })}

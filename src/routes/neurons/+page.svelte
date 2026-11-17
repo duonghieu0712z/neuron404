@@ -3,7 +3,6 @@
 
     import { resolve } from '$app/paths';
 
-    import { Button } from '#lib/components/ui/button';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
     import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
 
@@ -34,7 +33,6 @@
         {:else}
             <div class="flex flex-col items-start gap-3 rounded-sm border border-dashed p-8">
                 <p class="text-sm text-muted-foreground">No neurons yet.</p>
-                <Button href={resolve('/neurons/new')}>New neuron</Button>
             </div>
         {/if}
     {:else}
