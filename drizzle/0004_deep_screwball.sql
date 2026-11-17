@@ -1,0 +1,1 @@
+ALTER TABLE `neurons` DROP COLUMN `status`;

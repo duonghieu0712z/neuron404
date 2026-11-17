@@ -50,7 +50,6 @@ export async function persistIndexChanges(db: Db, changes: IndexChanges) {
             const values = {
                 id: neuron.id,
                 title: neuron.title,
-                status: neuron.status,
                 grounding: neuron.grounding,
                 endorsement: neuron.endorsement,
                 provenance: neuron.provenance,

@@ -3,7 +3,6 @@
 
     import { resolve } from '$app/paths';
 
-    import { Badge } from '#lib/components/ui/badge';
     import { Button } from '#lib/components/ui/button';
     import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card';
     import { getNeuronPanelContext } from '#lib/neuron-panel.svelte';
@@ -77,14 +76,6 @@
                                             {neuron.title}
                                         </a>
                                     </CardTitle>
-                                    <Badge
-                                        variant={neuron.status === 'published'
-                                            ? 'default'
-                                            : 'outline'}
-                                        class="shrink-0"
-                                    >
-                                        {neuron.status}
-                                    </Badge>
                                 </div>
                             </CardHeader>
                             <CardContent class="space-y-2">

@@ -4,7 +4,6 @@ import { index, int, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 export const neurons = sqliteTable('neurons', {
     id: text('id').primaryKey(),
     title: text('title').notNull(),
-    status: text('status').notNull(),
     grounding: text('grounding').notNull(),
     endorsement: text('endorsement').notNull(),
     provenance: text('provenance').notNull(),

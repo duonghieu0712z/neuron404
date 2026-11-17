@@ -13,7 +13,6 @@ export async function createNeuron(db: Db, input: NewNeuronInput) {
         const frontmatter = neuronFrontmatterSchema.parse({
             ...input,
             id: createNeuronId(),
-            status: 'draft',
             created: now,
             updated: now,
         });

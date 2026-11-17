@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-export const NEURON_STATUSES = ['draft', 'published'] as const;
 export const GROUNDING_LEVELS = ['assumption', 'inferred', 'sourced'] as const;
 export const ENDORSEMENT_LEVELS = ['unreviewed', 'self-endorsed', 'reviewed', 'disputed'] as const;
 export const PROVENANCE_SOURCES = ['original', 'derived', 'external'] as const;
@@ -34,7 +33,6 @@ export const neuronFrontmatterSchema = z
     .object({
         id: z.string().min(1),
         title: z.string().min(1),
-        status: z.enum(NEURON_STATUSES).default('draft'),
         created: z.string(),
         updated: z.string(),
         grounding: z.enum(GROUNDING_LEVELS),
@@ -51,6 +49,11 @@ export const neuronFrontmatterSchema = z
     .passthrough()
     .refine((data) => !Object.hasOwn(data, 'topics'), {
         message: 'Legacy Region membership found. Run pnpm neuron migrate.',
+    })
+    .transform((data) => {
+        delete data.status;
+
+        return data;
     });
 
 export const newNeuronInputSchema = z.object({
@@ -79,7 +82,6 @@ export const updateNeuronInputSchema = newNeuronInputSchema.partial().extend({
     sources: newNeuronInputSchema.shape.sources.removeDefault().optional(),
     retrievalCues: retrievalCuesSchema.removeDefault().optional(),
     expectedRevision: z.string().regex(/^[a-f0-9]{64}$/),
-    status: z.enum(NEURON_STATUSES).optional(),
     lifecycle: z.enum(['active', 'superseded', 'retracted']).optional(),
     supersededBy: z.string().min(1).nullable().optional(),
 });

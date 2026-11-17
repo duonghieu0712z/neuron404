@@ -41,8 +41,6 @@
 {#snippet metadata()}
     <DetailSection title="Metadata" size={layout === 'panel' ? 'sm' : 'default'}>
         <div class="flex flex-wrap gap-1.5 pt-1">
-            <Badge variant="outline">{data.neuron.status}</Badge>
-
             {#if data.neuron.lifecycle !== 'active'}
                 <Badge variant="outline">{data.neuron.lifecycle}</Badge>
             {/if}
