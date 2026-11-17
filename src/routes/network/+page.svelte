@@ -71,7 +71,7 @@
         selectedNeuron: () => panel.selected?.neuron.id ?? null,
         selectedRegion: () => selectedRegionId,
         preferredRegion: () => filters.region || null,
-        autoFocus: () => true,
+        autoFocus: () => preferences.autoFocus,
         openNeuron: panel.open,
         openRegion: panel.openRegion,
         close: panel.close,
@@ -316,6 +316,7 @@
         {renderer}
         {refreshing}
         {refreshNetwork}
+        bind:autoFocus={preferences.autoFocus}
         bind:controlsOpen={preferences.controlsOpen}
         bind:membershipMode={preferences.membershipMode}
         bind:showLabels={preferences.showLabels}

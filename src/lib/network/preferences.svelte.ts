@@ -8,6 +8,7 @@ export function createNetworkPreferences() {
         controlsOpen: true,
         showLabels: true,
         motionEnabled: true,
+        autoFocus: true,
         membershipMode: 'auto' as MembershipMode,
         sections: {
             regions: true,
@@ -37,6 +38,10 @@ export function createNetworkPreferences() {
 
                 if (typeof saved.showLabels === 'boolean') {
                     preferences.showLabels = saved.showLabels;
+                }
+
+                if (typeof saved.autoFocus === 'boolean') {
+                    preferences.autoFocus = saved.autoFocus;
                 }
 
                 if (typeof saved.motionEnabled === 'boolean') {
@@ -72,6 +77,7 @@ export function createNetworkPreferences() {
             controlsOpen: preferences.controlsOpen,
             showLabels: preferences.showLabels,
             motionEnabled: preferences.motionEnabled,
+            autoFocus: preferences.autoFocus,
             membershipMode: preferences.membershipMode,
             sections: preferences.sections,
         });

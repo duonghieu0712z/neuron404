@@ -2,6 +2,7 @@
     import type { MembershipMode } from '#lib/network/membership';
     import type Sigma from 'sigma';
 
+    import CrosshairIcon from '@lucide/svelte/icons/crosshair';
     import EyeOffIcon from '@lucide/svelte/icons/eye-off';
     import MaximizeIcon from '@lucide/svelte/icons/maximize';
     import MinusIcon from '@lucide/svelte/icons/minus';
@@ -31,6 +32,7 @@
         renderer,
         refreshing,
         refreshNetwork,
+        autoFocus = $bindable(),
         controlsOpen = $bindable(),
         membershipMode = $bindable(),
         showLabels = $bindable(),
@@ -40,6 +42,7 @@
         renderer: Sigma | null;
         refreshing: boolean;
         refreshNetwork: () => Promise<void>;
+        autoFocus: boolean;
         controlsOpen: boolean;
         membershipMode: MembershipMode;
         showLabels: boolean;
@@ -149,6 +152,22 @@
                         <TooltipContent side="left">{control.label}</TooltipContent>
                     </Tooltip>
                 {/each}
+                <Tooltip>
+                    <TooltipTrigger>
+                        {#snippet child({ props })}
+                            <Toggle
+                                {...props}
+                                bind:pressed={autoFocus}
+                                size="sm"
+                                class="size-8 p-0"
+                                aria-label="Automatic focus"
+                            >
+                                <CrosshairIcon class="size-4" />
+                            </Toggle>
+                        {/snippet}
+                    </TooltipTrigger>
+                    <TooltipContent side="left">Automatic focus</TooltipContent>
+                </Tooltip>
                 <Tooltip>
                     <TooltipTrigger>
                         {#snippet child({ props })}
