@@ -35,13 +35,16 @@ export function createNetworkRenderer(options: RendererOptions) {
     const sigmaInstance = createSigmaRenderer(network, options.container, state, theme === 'dark');
 
     const disposeLabels = createLabelLayer(sigmaInstance, state);
+    let hoveredMembership: MembershipLink | null = null;
     const disposeRegions = createRegionLayer(sigmaInstance, data, state, theme, (link) => {
         if (link) {
             if (!hover.isOver('node') && !hover.isOver('edge')) {
+                hoveredMembership = link;
                 hover.enter({ kind: 'membership', link });
             }
-        } else if (hover.isOver('membership')) {
-            hover.clear();
+        } else if (hoveredMembership) {
+            hover.leave({ kind: 'membership', link: hoveredMembership });
+            hoveredMembership = null;
         }
     });
     const synapseSignals = createSynapseSignals(sigmaInstance, () => state.signalLabelMasks);

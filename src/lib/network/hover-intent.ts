@@ -32,11 +32,7 @@ export function createHoverIntent(onChange: (target: HoverTarget | null) => void
         }
         cancelTimer();
         target = next;
-        if (active) {
-            active = null;
-            onChange(null);
-        }
-        if (next) {
+        if (!sameTarget(active, next)) {
             timer = setTimeout(() => {
                 timer = null;
                 active = next;
@@ -56,7 +52,12 @@ export function createHoverIntent(onChange: (target: HoverTarget | null) => void
             return target?.kind === kind;
         },
         clear() {
-            enter(null);
+            cancelTimer();
+            target = null;
+            if (active) {
+                active = null;
+                onChange(null);
+            }
         },
         cancelPending() {
             cancelTimer();
