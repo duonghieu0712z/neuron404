@@ -1,10 +1,13 @@
 import type { RenderState } from './render-state';
 import type Network from 'graphology';
+import type { PrimitivesDeclaration } from 'sigma/primitives';
 
 import Sigma, { DEFAULT_DEPTH_LAYERS, DEFAULT_STYLES } from 'sigma';
 import { layerPlain, sdfCircle } from 'sigma/rendering';
 
+import { LABEL_FONT_SIZE } from './appearance';
 import { getEdgeAppearance } from './edge-appearance';
+import { createLabelContinuation } from './label-continuation';
 import { createDimmedNodeColors } from './node-appearance';
 import { regionHexagon } from './region-node';
 
@@ -21,23 +24,36 @@ export function createSigmaRenderer(
         getComputedStyle(container).getPropertyValue('--background').trim(),
     );
 
-    return new Sigma(network, container, {
-        primitives: {
-            depthLayers: [
-                ...DEFAULT_DEPTH_LAYERS,
-                'regionNodes',
-                'selectedNodes',
-                'hoveredNodes',
-                'labels',
-            ],
-            nodes: { shapes: [sdfCircle(), regionHexagon()] },
-            edges: {
-                variables: {
-                    solidColor: { type: 'color', default: '#00000000' },
-                },
-                layers: [layerPlain({ color: { attribute: 'solidColor' } })],
+    const primitives = {
+        depthLayers: [
+            ...DEFAULT_DEPTH_LAYERS,
+            'regionNodes',
+            'selectedNodes',
+            'hoveredNodes',
+            'labels',
+            'multilineLabels',
+        ] as const,
+        nodes: {
+            shapes: [sdfCircle(), regionHexagon()],
+            labelAttachments: {
+                continuation: ({ attributes, pixelRatio }) =>
+                    createLabelContinuation(
+                        String(attributes.labelContinuation ?? ''),
+                        pixelRatio,
+                        Number(attributes.labelContinuationWidth ?? 0),
+                    ),
             },
         },
+        edges: {
+            variables: {
+                solidColor: { type: 'color', default: '#00000000' },
+            },
+            layers: [layerPlain({ color: { attribute: 'solidColor' } })],
+        },
+    } as const satisfies PrimitivesDeclaration;
+
+    return new Sigma(network, container, {
+        primitives,
         settings: {
             autoRescale: 'once',
             enableNodeDrag: true,
@@ -76,6 +92,19 @@ export function createSigmaRenderer(
         },
         nodeReducer: (id, attributes, nodeAttributes) => {
             const expanded = id === state.activeNode || id === state.selectedNode;
+            const fullLabel = state.expandedLabels[id] ?? nodeAttributes.label;
+            const multiline = fullLabel.includes('\n');
+            const above = state.labelPlacements.get(id) === 'above';
+            const expandedLabel = {
+                label: multiline
+                    ? String(nodeAttributes.labelContinuationAnchor ?? fullLabel.split('\n')[0])
+                    : fullLabel,
+                labelSize: LABEL_FONT_SIZE,
+                labelColor: multiline ? '#00000000' : foreground,
+                labelAttachment: multiline ? 'continuation' : null,
+                labelAttachmentPlacement: above ? ('above' as const) : ('below' as const),
+                backdropArea: 'both' as const,
+            };
             const searchDimmed =
                 !state.matchesSearch(id) && !expanded && !state.neighborhood.has(id);
             const dimmedColor = dimmedColors.get(attributes.color);
@@ -85,17 +114,17 @@ export function createSigmaRenderer(
             ];
 
             if (state.activeEdge || state.activeMembership) {
-                const highlighted = state.edgeEndpoints.has(id);
+                const highlighted = state.edgeEndpoints.has(id) || id === state.selectedNode;
                 const placement = state.labelPlacements.get(id);
 
                 return {
                     color: highlighted ? attributes.color : dimmedColor,
                     opacity: 1,
-                    label: nodeAttributes.label,
+                    ...expandedLabel,
                     labelVisibility: highlighted && placement ? 'visible' : 'hidden',
                     labelPosition: placement ?? 'below',
                     depth: highlighted ? nodeDepth : 'nodes',
-                    backdropArea: 'both',
+                    backdropArea: expandedLabel.backdropArea,
                     backdropVisibility: highlighted && placement ? 'visible' : 'hidden',
                 };
             }
@@ -103,14 +132,17 @@ export function createSigmaRenderer(
             if (state.regionByNodeId.has(id)) {
                 return {
                     ...attributes,
-                    label: nodeAttributes.label,
-                    labelVisibility: 'visible',
-                    labelPosition: 'below',
+                    ...expandedLabel,
+                    labelVisibility: state.labelPlacements.has(id) ? 'visible' : 'hidden',
+                    labelPosition: state.labelPlacements.get(id) ?? 'below',
                     depth: expanded ? nodeDepth : 'nodes',
                     color: searchDimmed ? dimmedColor : attributes.color,
                     opacity: 1,
-                    backdropArea: 'both',
-                    backdropVisibility: expanded ? 'visible' : 'hidden',
+                    backdropArea: expandedLabel.backdropArea,
+                    backdropVisibility:
+                        state.labelPlacements.has(id) && (expanded || expandedLabel.labelAttachment)
+                            ? 'visible'
+                            : 'hidden',
                 };
             }
 
@@ -124,8 +156,11 @@ export function createSigmaRenderer(
             }
 
             const label = expanded
-                ? nodeAttributes.label
+                ? expandedLabel.label
                 : (state.compactLabels[id] ?? nodeAttributes.shortLabel);
+            const labelAttachment = expanded ? expandedLabel.labelAttachment : null;
+            const labelSize = expanded ? expandedLabel.labelSize : LABEL_FONT_SIZE;
+            const labelColor = expanded ? expandedLabel.labelColor : foreground;
 
             const placement = state.labelPlacements.get(id);
 
@@ -136,6 +171,10 @@ export function createSigmaRenderer(
                 return {
                     ...attributes,
                     label,
+                    labelSize,
+                    labelColor,
+                    labelAttachment,
+                    labelAttachmentPlacement: expandedLabel.labelAttachmentPlacement,
                     labelVisibility,
                     labelPosition: placement ?? 'below',
                 };
@@ -147,11 +186,15 @@ export function createSigmaRenderer(
 
             return {
                 label,
+                labelSize,
+                labelColor,
+                labelAttachment,
+                labelAttachmentPlacement: expandedLabel.labelAttachmentPlacement,
                 opacity: 1,
                 labelVisibility,
                 labelPosition: placement ?? 'below',
                 depth: expanded ? nodeDepth : 'nodes',
-                backdropArea: 'both',
+                backdropArea: expandedLabel.backdropArea,
                 backdropVisibility: expanded && placement ? 'visible' : 'hidden',
             };
         },

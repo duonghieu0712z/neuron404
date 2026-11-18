@@ -4,8 +4,10 @@ import type { NetworkData, NetworkPositions, NetworkTheme } from './types';
 import { REGION_COLOR, SYNAPSE_COLORS } from './appearance';
 import { createNetworkGraph } from './graph';
 import { createHoverIntent } from './hover-intent';
+import { createLabelInteractions } from './label-interactions';
 import { createLabelLayer } from './label-layer';
 import { getVisibleMembershipLinks, type MembershipMode } from './membership';
+import { createMultilineLabelLayer } from './multiline-label-layer';
 import { createRegionLayer } from './region-layer';
 import { getRegionNodeId } from './region-node';
 import { createRenderState } from './render-state';
@@ -35,6 +37,11 @@ export function createNetworkRenderer(options: RendererOptions) {
     const sigmaInstance = createSigmaRenderer(network, options.container, state, theme === 'dark');
 
     const disposeLabels = createLabelLayer(sigmaInstance, state);
+    const disposeMultilineLabels = createMultilineLabelLayer(
+        sigmaInstance,
+        state,
+        theme === 'dark' ? '#e5e7eb' : '#272d38',
+    );
     let hoveredMembership: MembershipLink | null = null;
     const disposeRegions = createRegionLayer(sigmaInstance, data, state, theme, (link) => {
         if (link) {
@@ -223,9 +230,7 @@ export function createNetworkRenderer(options: RendererOptions) {
 
     const motion = createRendererMotion(sigmaInstance, graph, positions, synapseSignals);
 
-    sigmaInstance.on('clickNode', ({ node, event }) => {
-        event.original.stopPropagation();
-
+    const openNode = (node: string) => {
         const region = state.regionByNodeId.get(node);
 
         if (region) {
@@ -233,6 +238,18 @@ export function createNetworkRenderer(options: RendererOptions) {
         } else {
             void options.onOpenNeuron(node);
         }
+    };
+
+    const disposeLabelInteractions = createLabelInteractions(sigmaInstance, state, {
+        enter: (id) => hover.enter({ kind: 'node', id }),
+        leave: (id) => hover.leave({ kind: 'node', id }),
+        open: openNode,
+        cancelPending: cancelPendingHover,
+    });
+
+    sigmaInstance.on('clickNode', ({ node, event }) => {
+        event.original.stopPropagation();
+        openNode(node);
     });
 
     sigmaInstance.on('clickStage', ({ event }) => {
@@ -265,6 +282,8 @@ export function createNetworkRenderer(options: RendererOptions) {
             options.container.removeEventListener('pointerdown', cancelPendingHover);
             synapseSignals.dispose();
             disposeLabels();
+            disposeMultilineLabels();
+            disposeLabelInteractions();
             disposeRegions();
             motion.dispose();
             resizeObserver.disconnect();

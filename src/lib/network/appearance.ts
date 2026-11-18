@@ -3,6 +3,10 @@ import type { Synapse } from '#lib/neuron/schema';
 export const NODE_SIZE = 8;
 export const LABEL_MAX_LENGTH = 40;
 export const LABEL_MAX_WIDTH = 140;
+export const EXPANDED_LABEL_MAX_WIDTH = 280;
+export const LABEL_FONT_SIZE = 12;
+export const LABEL_LINE_HEIGHT = LABEL_FONT_SIZE * 1.4;
+export const LABEL_PADDING = 8;
 
 export function shortenLabel(title: string) {
     const characters = Array.from(title);

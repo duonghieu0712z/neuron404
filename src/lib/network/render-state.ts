@@ -24,6 +24,8 @@ export function createRenderState(data: NetworkData, membership: MembershipMode)
         labelPlacements: new Map<string, LabelPlacement>(),
         signalLabelMasks: [] as ReturnType<typeof labelBox>[],
         compactLabels: Object.create(null) as Record<string, string | undefined>,
+        expandedLabels: Object.create(null) as Record<string, string | undefined>,
+        expandedLabelAreas: new Map<string, ReturnType<typeof labelBox>>(),
         regionByNodeId,
         matchesSearch(id: string): boolean {
             const matches = state.searchMatches;
