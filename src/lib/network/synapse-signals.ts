@@ -1,5 +1,6 @@
 import type Sigma from 'sigma';
 
+import { createFrameCache } from './frame-cache';
 import { getVisibleSignalIntervals, type SignalMask } from './signal-clipping';
 import { getSynapsePulse, phaseOffset, type SignalLink } from './signal-geometry';
 import { createShapeProgram, shapeColor, ShapeMesh } from './webgl-shapes';
@@ -16,16 +17,24 @@ export function createSynapseSignals(
     let enabled = false;
     let frame: number | null = null;
     let disposed = false;
+    let renderDepth = 0;
+    let sceneReady = false;
+    let nodes = new Map<string, { x: number; y: number; radius: number }>();
+    let nodeMasks: { x: number; y: number; radius: number }[] = [];
+    let labelMasks: SignalMask[] = [];
+    let camera = renderer.getCamera().getState();
+    const mesh = new ShapeMesh();
+
+    const createResources = () => {
+        const gl = renderer.getWebGLContext();
+        return { gl, cache: createFrameCache(gl), program: createShapeProgram(gl) };
+    };
+    let resources: ReturnType<typeof createResources> | null = createResources();
 
     const canAnimate = () => !disposed && enabled && !document.hidden && links.length > 0;
 
-    const buildMesh = () => {
-        const mesh = new ShapeMesh();
-        if (!canAnimate()) {
-            return mesh;
-        }
-
-        const nodes = new Map(
+    const prepareScene = () => {
+        nodes = new Map(
             graph
                 .filterNodes((id) => !renderer.getNodeState(id).isHidden)
                 .map((id) => {
@@ -36,11 +45,16 @@ export function createSynapseSignals(
                             ...renderer.graphToViewport({ x: node.x, y: node.y }),
                             radius: renderer.scaleSize(node.size),
                         },
-                    ] as const;
+                    ];
                 }),
         );
-        const nodeMasks = [...nodes.values()];
-        const labelMasks = getLabelMasks();
+        nodeMasks = [...nodes.values()];
+        labelMasks = getLabelMasks();
+        camera = renderer.getCamera().getState();
+    };
+
+    const buildMesh = () => {
+        mesh.reset();
         const elapsed = performance.now() - startedAt;
 
         for (const link of links) {
@@ -94,22 +108,47 @@ export function createSynapseSignals(
         return mesh;
     };
 
-    renderer.addCustomLayerProgram('synapse-signals', 'nodes', (gl) => {
-        const program = createShapeProgram(gl);
-        return {
-            render({ width, height }) {
-                program.draw(buildMesh(), width, height);
-            },
-            kill: program.kill,
-        };
-    });
+    const drawSignals = () => {
+        if (!resources || !canAnimate()) {
+            return;
+        }
+        const { gl, program } = resources;
+        const { width, height } = renderer.getDimensions();
+        const framebuffer = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
+        const viewport = gl.getParameter(gl.VIEWPORT) as Int32Array;
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+        try {
+            program.draw(buildMesh(), width, height);
+        } finally {
+            gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, framebuffer);
+            gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        }
+    };
+
+    const invalidate = () => {
+        sceneReady = false;
+        resources?.cache.invalidate();
+    };
 
     const animate = () => {
         frame = null;
-        if (!canAnimate()) {
+        if (!canAnimate() || !resources || resources.gl.isContextLost()) {
             return;
         }
-        renderer.scheduleRender();
+        const nextCamera = renderer.getCamera().getState();
+        if (
+            sceneReady &&
+            camera.x === nextCamera.x &&
+            camera.y === nextCamera.y &&
+            camera.ratio === nextCamera.ratio &&
+            camera.angle === nextCamera.angle &&
+            resources.cache.restore()
+        ) {
+            drawSignals();
+        } else {
+            renderer.scheduleRender();
+        }
         frame = requestAnimationFrame(animate);
     };
 
@@ -118,14 +157,69 @@ export function createSynapseSignals(
             if (frame === null) {
                 frame = requestAnimationFrame(animate);
             }
+            if (!sceneReady) {
+                renderer.scheduleRender();
+            }
         } else {
             if (frame !== null) {
                 cancelAnimationFrame(frame);
+                frame = null;
             }
+            if (!document.hidden && !disposed && (!sceneReady || !resources?.cache.restore())) {
+                renderer.scheduleRender();
+            }
+        }
+    };
+
+    const beforeRender = () => {
+        renderDepth++;
+        invalidate();
+    };
+    // Nested renders must finish before capturing a signal-free scene.
+    const afterRender = () => {
+        renderDepth = Math.max(0, renderDepth - 1);
+        if (renderDepth || !canAnimate() || !resources || resources.gl.isContextLost()) {
+            return;
+        }
+        prepareScene();
+        sceneReady = resources.cache.capture();
+        drawSignals();
+    };
+    const contextLost = () => {
+        resources?.cache.dispose();
+        resources?.program.kill();
+        resources = null;
+        invalidate();
+        renderDepth = 0;
+        if (frame !== null) {
+            cancelAnimationFrame(frame);
             frame = null;
         }
-        renderer.scheduleRender();
     };
+    const contextRestored = () => {
+        resources = createResources();
+        invalidate();
+        update();
+    };
+    const graphEvents = [
+        'nodeAdded',
+        'nodeDropped',
+        'edgeAdded',
+        'edgeDropped',
+        'cleared',
+        'edgesCleared',
+        'nodeAttributesUpdated',
+        'edgeAttributesUpdated',
+        'eachNodeAttributesUpdated',
+        'eachEdgeAttributesUpdated',
+    ] as const;
+    for (const event of graphEvents) {
+        graph.on(event, invalidate);
+    }
+    renderer.on('beforeRender', beforeRender);
+    renderer.on('afterRender', afterRender);
+    renderer.on('webglContextLost', contextLost);
+    renderer.on('webglContextRestored', contextRestored);
 
     document.addEventListener('visibilitychange', update);
 
@@ -144,7 +238,16 @@ export function createSynapseSignals(
                 cancelAnimationFrame(frame);
             }
             frame = null;
-            renderer.removeCustomLayerProgram('synapse-signals');
+            renderer.off('beforeRender', beforeRender);
+            renderer.off('afterRender', afterRender);
+            renderer.off('webglContextLost', contextLost);
+            renderer.off('webglContextRestored', contextRestored);
+            for (const event of graphEvents) {
+                graph.off(event, invalidate);
+            }
+            resources?.cache.dispose();
+            resources?.program.kill();
+            resources = null;
             document.removeEventListener('visibilitychange', update);
         },
     };
