@@ -115,12 +115,14 @@
                 contentClass="flex min-h-0 flex-col"
             >
                 {#if data.regions.length > 0}
-                    <ScrollArea class="network-panel-scroll flex max-h-48 min-h-0 flex-col">
-                        <div class="space-y-0.5 p-1">
+                    <ScrollArea
+                        class="network-panel-scroll network-regions-scroll flex max-h-42 min-h-0 flex-col p-1"
+                    >
+                        <div class="flex flex-col">
                             {#each data.regions as region (region.id)}
                                 <Button
                                     variant={selectedRegionId === region.id ? 'secondary' : 'ghost'}
-                                    class="h-auto w-full justify-between gap-3 px-2 py-1.5 text-xs"
+                                    class="h-8 w-full snap-start justify-between gap-3 px-2 py-1.5 text-xs"
                                     aria-pressed={selectedRegionId === region.id}
                                     onclick={() => void onOpenRegion(region.id)}
                                 >
@@ -224,6 +226,10 @@
 </Card>
 
 <style>
+    :global(.network-regions-scroll > [data-slot='scroll-area-viewport']) {
+        scroll-snap-type: y mandatory;
+    }
+
     :global(.network-panel-scroll > [data-slot='scroll-area-viewport']) {
         height: auto;
         min-height: 0;
