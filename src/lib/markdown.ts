@@ -1,6 +1,6 @@
 import type { Tokens } from 'marked';
 
-import { Lexer, Parser, Renderer } from 'marked';
+import { Lexer, Parser, Renderer, walkTokens } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 
 import { webHref } from '#lib/links';
@@ -29,6 +29,8 @@ export function renderMarkdownBlocks(
 
     const tokens = Lexer.lex(content, { gfm: true });
     const references = new Map<string, { label: string; description: string; snapshot?: string }>();
+    const numberedReferences = new Map<string, Tokens.Link | null>();
+    const referenceMarkers = new Set<Tokens.Generic>();
 
     for (const token of tokens) {
         if (token.type !== 'paragraph' || !token.tokens) {
@@ -39,9 +41,20 @@ export function renderMarkdownBlocks(
         const link = token.tokens[1];
 
         if (number && link?.type === 'link') {
+            referenceMarkers.add(token.tokens[0]);
+
+            const snapshot = /Snapshot(?::|\s)\s*(?:sha256:)?`?([a-f0-9]{64})/.exec(token.raw)?.[1];
+
+            const existing = numberedReferences.get(number);
+
+            numberedReferences.set(
+                number,
+                existing === undefined || (existing && existing.href === link.href) ? link : null,
+            );
+
             references.set(citationKey(number, link.href), {
                 label: link.text,
-                snapshot: /Snapshot sha256:([a-f0-9]{64})/.exec(link.title ?? '')?.[1],
+                snapshot: /Snapshot sha256:([a-f0-9]{64})/.exec(link.title ?? '')?.[1] ?? snapshot,
                 description:
                     token.tokens
                         .slice(2)
@@ -52,6 +65,68 @@ export function renderMarkdownBlocks(
             });
         }
     }
+
+    const linkReferences = (inlineTokens: Tokens.Generic[]) =>
+        inlineTokens.flatMap((token): Tokens.Generic[] => {
+            if (token.type !== 'text' || token.tokens || referenceMarkers.has(token)) {
+                return [token];
+            }
+
+            const result: Tokens.Generic[] = [];
+            let offset = 0;
+
+            for (const match of token.raw.matchAll(/\[(\d+)\]/g)) {
+                const reference = numberedReferences.get(match[1]);
+
+                if (!reference) {
+                    continue;
+                }
+
+                const preceding = token.raw.slice(offset, match.index);
+
+                if (preceding) {
+                    result.push({ type: 'text', raw: preceding, text: preceding });
+                }
+
+                result.push({
+                    type: 'link',
+                    raw: match[0],
+                    href: reference.href,
+                    title: reference.title,
+                    text: match[0],
+                    tokens: [{ type: 'text', raw: match[0], text: match[0] }],
+                });
+                offset = match.index + match[0].length;
+            }
+
+            if (!offset) {
+                return [token];
+            }
+
+            const remaining = token.raw.slice(offset);
+
+            if (remaining) {
+                result.push({ type: 'text', raw: remaining, text: remaining });
+            }
+
+            return result;
+        });
+
+    walkTokens(tokens, (token) => {
+        if (token.type === 'link' || token.type === 'image') {
+            return;
+        }
+
+        if ('tokens' in token && token.tokens) {
+            token.tokens = linkReferences(token.tokens);
+        }
+
+        if (token.type === 'table') {
+            for (const cell of [...token.header, ...token.rows.flat()]) {
+                cell.tokens = linkReferences(cell.tokens);
+            }
+        }
+    });
 
     const renderer = new Renderer();
     const renderLink = renderer.link.bind(renderer);

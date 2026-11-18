@@ -82,17 +82,13 @@
             role="tooltip"
             customAnchor={citation?.anchor}
             sideOffset={6}
-            class="max-w-sm flex-col items-start gap-1 break-words"
+            class="max-w-[min(24rem,calc(100vw-2rem))] flex-col items-start gap-1 [overflow-wrap:anywhere] whitespace-normal"
             onpointerenter={interactions.cancelClose}
             onpointerleave={interactions.scheduleClose}
         >
             {#if citation}
-                <span class="font-medium">{citation.label}</span>
-
-                {#if citation.description}
-                    <span>{citation.description}</span>
-                {/if}
-                <span class="text-xs break-all opacity-75">{citation.anchor.href}</span>
+                <span class="w-full min-w-0 font-medium">{citation.label}</span>
+                <span class="w-full min-w-0 text-xs opacity-75">{citation.anchor.href}</span>
             {/if}
         </TooltipContent>
     </Tooltip>
