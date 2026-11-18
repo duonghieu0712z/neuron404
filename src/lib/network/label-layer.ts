@@ -131,6 +131,7 @@ export function createLabelLayer(sigmaInstance: Sigma, state: RenderState) {
                     radius: sigmaInstance.scaleSize(attributes.size),
                     required: expanded,
                     selected: id === state.selectedNode,
+                    belowFirst: isRegion,
                     priority: state.focusPriority(id),
                 };
             });

@@ -13,6 +13,7 @@ export interface LabelCandidate {
     priority: number;
     required?: boolean;
     selected?: boolean;
+    belowFirst?: boolean;
 }
 
 interface Box {
@@ -73,8 +74,12 @@ export function chooseLabelPlacements(
         bottom: node.y + node.radius + 3,
     }));
 
-    for (const candidate of candidates) {
-        if (!candidate.selected || !candidate.required) {
+    const anchored = [...candidates].sort(
+        (a, b) => Number(b.selected ?? false) - Number(a.selected ?? false),
+    );
+
+    for (const candidate of anchored) {
+        if ((!candidate.selected && !candidate.belowFirst) || !candidate.required) {
             continue;
         }
 
@@ -82,7 +87,11 @@ export function chooseLabelPlacements(
         const placement = options.find((option) => {
             const box = labelBox(candidate, option);
             return (
-                box.left >= 4 && box.right <= width - 4 && box.top >= 4 && box.bottom <= height - 4
+                box.left >= 4 &&
+                box.right <= width - 4 &&
+                box.top >= 4 &&
+                box.bottom <= height - 4 &&
+                (candidate.selected || !occupied.some((other) => intersects(box, other)))
             );
         });
 
