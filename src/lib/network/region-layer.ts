@@ -23,8 +23,30 @@ export function createRegionLayer(
     const hover = createMembershipHover(sigmaInstance, onHover, () => state.activeEdge !== null);
 
     let segments: MembershipSegment[] = [];
+    let cachedMesh: ShapeMesh | null = null;
+    let cachedKey = '';
 
     const buildMesh = () => {
+        const key = JSON.stringify([
+            sigmaInstance.getDimensions(),
+            sigmaInstance.getCamera().getState(),
+            state.activeNode,
+            state.selectedNode,
+            state.activeEdge,
+            state.activeMembership,
+            state.visibleMembershipMode,
+            state.searchMatches ? [...state.searchMatches].sort() : null,
+            network.mapNodes((id, node) => [
+                id,
+                node.x,
+                node.y,
+                node.size,
+                sigmaInstance.getNodeState(id).isHidden,
+            ]),
+        ]);
+        if (cachedMesh && key === cachedKey) {
+            return cachedMesh;
+        }
         const mesh = new ShapeMesh();
 
         for (const region of data.regions) {
@@ -69,14 +91,12 @@ export function createRegionLayer(
                 const control = hull[index];
                 const next = hull[(index + 1) % hull.length];
                 const end = { x: (control.x + next.x) / 2, y: (control.y + next.y) / 2 };
-                const steps = Math.max(
-                    2,
-                    Math.ceil(
-                        (Math.hypot(control.x - previous.x, control.y - previous.y) +
-                            Math.hypot(end.x - control.x, end.y - control.y)) /
-                            6,
-                    ),
-                );
+                const deviation =
+                    Math.hypot(
+                        previous.x - 2 * control.x + end.x,
+                        previous.y - 2 * control.y + end.y,
+                    ) / 4;
+                const steps = Math.max(1, Math.min(64, Math.ceil(Math.sqrt(deviation / 0.35))));
 
                 for (let step = 1; step <= steps; step++) {
                     const t = step / steps;
@@ -175,6 +195,8 @@ export function createRegionLayer(
             );
         }
 
+        cachedKey = key;
+        cachedMesh = mesh;
         return mesh;
     };
 

@@ -16,9 +16,16 @@ export function shapeColor(hex: string, opacity = 1): Color {
 
 export class ShapeMesh {
     readonly vertices: number[] = [];
+    revision = 0;
+
+    reset() {
+        this.vertices.length = 0;
+        this.revision++;
+    }
 
     private vertex(point: Point, local: Point, color: Color, radius: number, length: number) {
         this.vertices.push(point.x, point.y, local.x, local.y, ...color, radius, length);
+        this.revision++;
     }
 
     fill(points: Point[], color: Color) {
@@ -190,8 +197,18 @@ export function createShapeProgram(gl: WebGL2RenderingContext) {
     const program = gl.createProgram();
     const buffer = gl.createBuffer();
     const vao = gl.createVertexArray();
+    let alive = true;
+    const contextLost = () => {
+        alive = false;
+    };
+    gl.canvas.addEventListener('webglcontextlost', contextLost);
 
     const kill = () => {
+        gl.canvas.removeEventListener('webglcontextlost', contextLost);
+        if (!alive || gl.isContextLost()) {
+            return;
+        }
+        alive = false;
         for (const shader of shaders) {
             gl.deleteShader(shader);
         }
@@ -248,9 +265,20 @@ export function createShapeProgram(gl: WebGL2RenderingContext) {
     gl.bindVertexArray(previousVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, previousBuffer);
 
+    let data = new Float32Array(0);
+    let capacity = 0;
+    let uploadedMesh: ShapeMesh | null = null;
+    let uploadedRevision = -1;
+
     return {
         draw(mesh: ShapeMesh, width: number, height: number) {
-            if (!mesh.vertices.length || width <= 0 || height <= 0 || gl.isContextLost()) {
+            if (
+                !alive ||
+                !mesh.vertices.length ||
+                width <= 0 ||
+                height <= 0 ||
+                gl.isContextLost()
+            ) {
                 return;
             }
 
@@ -270,7 +298,19 @@ export function createShapeProgram(gl: WebGL2RenderingContext) {
             gl.useProgram(program);
             gl.bindVertexArray(vao);
             gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.vertices), gl.DYNAMIC_DRAW);
+            if (uploadedMesh !== mesh || uploadedRevision !== mesh.revision) {
+                if (data.length < mesh.vertices.length) {
+                    data = new Float32Array(2 ** Math.ceil(Math.log2(mesh.vertices.length)));
+                }
+                data.set(mesh.vertices);
+                if (capacity < data.byteLength) {
+                    gl.bufferData(gl.ARRAY_BUFFER, data.byteLength, gl.DYNAMIC_DRAW);
+                    capacity = data.byteLength;
+                }
+                gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, mesh.vertices.length);
+                uploadedMesh = mesh;
+                uploadedRevision = mesh.revision;
+            }
             gl.uniform2f(resolution, width, height);
             gl.drawArrays(gl.TRIANGLES, 0, mesh.vertices.length / 10);
 
