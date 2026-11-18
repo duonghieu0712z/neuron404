@@ -58,6 +58,10 @@ export function createHoverIntent(onChange: (target: HoverTarget | null) => void
         clear() {
             enter(null);
         },
+        cancelPending() {
+            cancelTimer();
+            target = active;
+        },
         dispose() {
             disposed = true;
             cancelTimer();

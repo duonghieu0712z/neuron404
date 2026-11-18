@@ -209,13 +209,14 @@ export function createNetworkRenderer(options: RendererOptions) {
         options.onHover(target?.kind === 'node' ? target.id : null);
     });
     const clearHover = () => hover.clear();
+    const cancelPendingHover = () => hover.cancelPending();
 
     sigmaInstance.on('enterEdge', ({ edge }) => hover.enter({ kind: 'edge', id: edge }));
     sigmaInstance.on('leaveEdge', ({ edge }) => hover.leave({ kind: 'edge', id: edge }));
     sigmaInstance.on('enterNode', ({ node }) => hover.enter({ kind: 'node', id: node }));
     sigmaInstance.on('leaveNode', ({ node }) => hover.leave({ kind: 'node', id: node }));
     options.container.addEventListener('pointerleave', clearHover);
-    options.container.addEventListener('pointerdown', clearHover);
+    options.container.addEventListener('pointerdown', cancelPendingHover);
 
     const motion = createRendererMotion(sigmaInstance, graph, positions, synapseSignals);
 
@@ -258,7 +259,7 @@ export function createNetworkRenderer(options: RendererOptions) {
         dispose() {
             hover.dispose();
             options.container.removeEventListener('pointerleave', clearHover);
-            options.container.removeEventListener('pointerdown', clearHover);
+            options.container.removeEventListener('pointerdown', cancelPendingHover);
             synapseSignals.dispose();
             disposeLabels();
             disposeRegions();
